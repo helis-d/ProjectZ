@@ -1,0 +1,31 @@
+# Standalone Unity Dedicated Server container based on Ubuntu
+FROM ubuntu:22.04
+
+# Install basic dependencies and CA certificates for outgoing Nakama connections
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libstdc++6 \
+    libc6 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add a non-root user for security
+RUN useradd -ms /bin/bash unityuser
+USER unityuser
+
+# Set working directory
+WORKDIR /home/unityuser/app
+
+# Copy the Linux Headless Server build into the container image
+# Note: The BuildScript.cs puts it in Builds/LinuxServer/
+COPY --chown=unityuser:unityuser ./Builds/LinuxServer/ /home/unityuser/app/
+
+# Expose standard game server port (FishNet default is usually UDP 7770)
+EXPOSE 7770/udp
+
+# Make the executable executable
+RUN chmod +x /home/unityuser/app/ProjectZ_Server.x86_64
+
+# Start the headless server
+# Additional arguments can be passed at runtime using override commands
+ENTRYPOINT ["/home/unityuser/app/ProjectZ_Server.x86_64"]
+CMD ["-batchmode", "-nographics"]

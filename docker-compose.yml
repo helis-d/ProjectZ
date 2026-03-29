@@ -1,0 +1,49 @@
+version: '3'
+services:
+  cockroachdb:
+    image: cockroachdb/cockroach:latest-v23.1
+    command: start-single-node --insecure --store=attrs=ssd,path=/var/lib/cockroach/
+    restart: "no"
+    environment:
+      - COCKROACH_DATABASE=nakama
+      - COCKROACH_USER=root
+    volumes:
+      - data:/var/lib/cockroach
+    expose:
+      - "8080"
+      - "26257"
+    ports:
+      - "26257:26257"
+      - "8080:8080"
+
+  nakama:
+    image: heroiclabs/nakama:3.21.1
+    entrypoint:
+      - "/bin/sh"
+      - "-ecx"
+      - >
+        /nakama/nakama migrate up --database.address root@cockroachdb:26257 &&
+        exec /nakama/nakama --name nakama1 --database.address root@cockroachdb:26257 --logger.level DEBUG --session.token_expiry_sec 7200 --metrics.prometheus_port 9100
+    restart: "no"
+    links:
+      - "cockroachdb:db"
+    depends_on:
+      - cockroachdb
+    volumes:
+      - ./backend/build:/nakama/data/modules # Nakama TS / Go modules mount point
+    expose:
+      - "7349"
+      - "7350"
+      - "7351"
+      - "9100"
+    ports:
+      - "7349:7349"
+      - "7350:7350"
+      - "7351:7351"
+    environment:
+      - NAKAMA_SERVER_KEY=${NAKAMA_SERVER_KEY:-defaultkey}
+      - NAKAMA_CONSOLE_USER=${NAKAMA_CONSOLE_USER:-admin}
+      - NAKAMA_CONSOLE_PASSWORD=${NAKAMA_CONSOLE_PASSWORD:-password}
+
+volumes:
+  data:

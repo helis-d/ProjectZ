@@ -1,0 +1,25 @@
+.colorSelectionRow
+{
+    flex-direction: row;
+    width: 100%;
+    align-content: flex-start;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.colorSelectionRowContent
+{
+    flex-direction: row;
+    max-width: 80%;
+    align-content: flex-start;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    /* TODO: Uncomment once all colors options are re-enabled */
+    /*justify-content: space-between;*/
+}
+
+.colorSelectionRowLabel
+{
+    min-width: 150px;
+    max-width: 20%;
+}

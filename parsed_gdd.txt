@@ -1,0 +1,618 @@
+Project Z – Game Design Document (GDD)
+# Section 1: Core Gameplay Mechanics
+## Game Loop and Round Structure
+The game is a tactical FPS between Attack and Defense teams. Teams compete to be the first to win a set number of rounds.
+Pistol Rounds:
+· Timing: The first round of the match and the first round after teams switch sides
+· Restrictions:
+  · Only pistol-type weapons can be used
+  · Weapon Mastery system is disabled
+  · Ultimate system is disabled (no charging, cannot be used)
+· Purpose: Opening rounds based on pure aiming skill that determine economic advantage
+Normal Rounds:
+· All rounds except pistol rounds
+· Weapon Mastery and Ultimate systems are active
+Technical Detail: Weapon Mastery System
+## Mathematical Progression Model
+The system uses a linear progression model, but penalties are dynamic.
+Level Thresholds:
+Each level requires 1000 XP:
+· Level 1: 0-999 XP
+· Level 2: 1000-1999 XP
+· Level 3: 2000-2999 XP
+· Level 4: 3000-3999 XP
+· Level 5: 4000+ XP (Maximum)
+XP Value Table:
+Action
+Condition
+XP Value
+Description
+KILL
+Body/Leg
++50 XP
+Standard kill
+KILL
+Headshot
++100 XP
+Rewarding mechanic
+ASSIST
+HP Only
++25 XP
+Enemy has no armor or armor is broken
+ASSIST
+Armor + HP
++50 XP
+Damage to both armor and HP
+ULTIMATE
+Ultimate Cast
++50 XP
+Added to most expensive weapon in inventory
+DEATH
+Body/Leg
+-25 XP
+Standard penalty
+DEATH
+Headshot
+-40 XP
+Penalty for enemy’s good aim
+DEATH
+Cold Streak
+-60 XP
+Triggered if 0 kills in last 3 rounds
+PENALTY
+Toxic/Sabotage
+-85 XP
+Deducted from highest level weapon
+## Buff System and Stat Modifications
+Buffs improve weapon base values by percentage or fixed values. Damage never changes.
+Example: “Viper” Assault Rifle:
+· Base (Level 1): Reload: 2.5s | ADS: 0.30s | Fire Rate: 600 RPM
+· Level 2: ADS speed increases by 10% (0.30s → 0.27s)
+· Level 3: Reload speed increases by 15% (2.5s → 2.12s)
+· Level 4: Movement speed increases by 5% (250 → 262.5 units/s)
+· Level 5: Fire Rate increases by 10% (600 RPM → 660 RPM)
+Calculation Logic:
+```
+FinalValue = BaseValue × (1 ± BuffModifier)
+```
+· For times (Reload/ADS): Value decreases (1 – Modifier)
+· For speeds (Movement/Fire Rate): Value increases (1 + Modifier)
+## Software Architecture
+Data Structures:
+```cpp
+Enum class MasteryEventType {
+    KillBody, KillHead, AssistHP, AssistArmorHP,
+    UltiCast, DeathBody, DeathHead, DeathColdStreak, PenaltyToxic
+};
+Class WeaponRuntimeData {
+    String WeaponID;
+    İnt CurrentXP = 0;
+    İnt CurrentLevel = 1;
+    İnt KillsInMatch = 0;
+    
+    Void AddXP(int amount) {
+        CurrentXP += amount;
+        İf (CurrentXP < 0) CurrentXP = 0;
+        
+        İnt newLevel = (CurrentXP / 1000) + 1;
+        newLevel = max(1, min(5, newLevel));
+        
+        if (newLevel != CurrentLevel) {
+            CurrentLevel = newLevel;
+            RecalculateStats();
+        }
+    }
+};
+```
+Critical Scenarios and Rules
+Dynamic Level Decrease:
+   · If a player at Level 3 (2050 XP) receives a cold streak penalty (-60 XP), XP drops to 1990
+   · Result: Player immediately drops to Level 2 and loses Level 3 buffs
+Pistol Round Exception:
+   · Rounds 1 and 13 (or round after side switch) are marked as “Pistol Round”
+   · No XP calculation in these rounds, but kill counter continues
+Minimum XP Protection:
+   · XP value can never drop below 0
+Ultimate XP Logic:
+   · XP is added to the most expensive weapon in inventory
+   · If primary weapon is not available, added to pistol
+# Section 2: Weapon Buff Configuration
+Mathematical Multiplier Logic
+· Time-based values (Lower is better): ADS time, reload time, weapon draw
+  · Formula: NewValue = BaseValue × Modifier
+· Speed-based values (Higher is better): Movement speed, fire rate
+  · Formula: NewValue = BaseValue × Modifier
+Weapon Class Configuration
+JSON Structure Example:
+```json
+{
+  “weapon_mastery_config”: {
+    “version”: “1.0”,
+    “classes”: {
+      “assault_rifle”: {
+        “description”: “Balanced power increase”,
+        “levels”: {
+          “1”: { “ads”: 1.0, “reload”: 1.0, “move”: 1.0 },
+          “2”: { “ads”: 0.90, “reload”: 1.0, “move”: 1.0 },
+          “3”: { “ads”: 0.90, “reload”: 0.85, “move”: 1.0 },
+          “4”: { “ads”: 0.85, “reload”: 0.85, “move”: 1.05 },
+          “5”: { “ads”: 0.85, “reload”: 0.80, “move”: 1.05 }
+        }
+      }
+    }
+  }
+}
+```
+Class-based Analysis
+Assault Rifle (AR):
+· Most balanced profile
+· Level 5: 15% fire rate increase
+SMG:
+· Focused on mobility
+· Level 5: 25% reload speed increase
+Sniper:
+· ADS and weapon swap speed prioritized
+· Level 5: 30% faster ADS
+Pistol:
+· Fast weapon swap is critical
+· Level 5: 50% faster weapon draw
+# Section 3: Visual Feedback and HUD Design
+Weapon Ownership and Reset Logic
+· When a weapon is dropped, all Mastery buff data is erased
+· New owner uses the weapon at Level 1
+HUD Design
+Bottom Right Corner (Weapon Panel):
+Level Icon: Roman numerals (I-V) or symbols
+   · Color Codes:
+     · Level 1: White
+     · Level 2: Green
+     · Level 3: Blue
+     · Level 4: Purple
+     · Level 5: Gold/Orange
+XP Progress Bar:
+   · Thin line below ammo count
+   · Flashes and shows “+100 XP” on XP gain
+Active Buff List:
+   · Small icons for buffs active at that level
+TAB Menu (Scoreboard):
+· Friendly Team: Weapon icon and level visible
+· Enemy Team: Weapon and level hidden (? Symbol)
+  · Exception: If enemy is visible, only weapon type is shown
+First-person Visual Effects
+· Level 1: Matte, standard weapon
+· Level 2: Slight heat effect on barrel
+· Level 3: Light leaks from weapon vents
+· Level 4: Static electricity ripple around weapon
+· Level 5: Core glows brightly, steam effect on reload
+Audio Design
+· Level Up Sound: Mechanical “click-ching” sound
+· Max Level Sound: Energy charging sound
+· Fire Sound (Optional): More “solid” sound at Level 5 (only player hears)
+# Section 4: Network Architecture and Synchronization
+## Communication Protocol
+· Pure UDP used
+· Built on Unreal Engine 5 networking framework
+Bit Packing and Quantization:
+```
+CompressedValue = ((WorldPosition – MinMap) / (MaxMap – MinMap)) × 65535
+```
+Time Synchronization
+```
+RTT = t2 – t1 (Round Trip Time)
+TimeOffset = ServerTime – (ClientTime + RTT/2)
+```
+## Client-side Prediction
+· Player moves immediately on input without waiting for server confirmation
+## Server Reconciliation
+· Server processes client input
+· Client compares with server result
+· Position corrected if error exceeds threshold
+## Entity Interpolation
+· Other players are rendered at their past positions
+· Linear interpolation used
+## Lag Compensation
+· Server stores last 1 second of player positions
+· When player shoots, server rewinds time and checks hit
+Weapon Mastery Data Replication
+· Data sent only when changed
+· Delta compression used (only difference sent)
+# Section 5: Physics Engine and Ballistics
+## Basic Hitscan Mathematics
+Bullet is an infinitely fast vector ray:
+```
+P(t) = Origin + Direction × t
+```
+## Material and Surface System
+Material Resistance Table:
+Material
+Penetrable
+Resistance/cm
+Max Thickness
+Wood
+YES
+0.8
+60.0 cm
+Stone
+YES
+2.5
+30.0 cm
+Metal
+NO
+Infinite
+0.0 cm
+Flesh
+YES
+0.1
+N/A
+## Wallbang Algorithm
+1. First hit point detected
+2. Exit point found (ray marching technique)
+3. Thickness calculated
+4. Damage reduction applied
+Damage Falloff Formula:
+```
+FinalDamage = BaseDamage × (1 – (Thickness × Density) / PenetrationPower)
+```
+Critical Gameplay Rules
+1. Corner Shots: Count as wallbang with minimum damage reduction
+2. Consecutive Walls: Bullet can penetrate multiple walls (damage reduces each time)
+3. Glass and Breakable Objects: Minimum resistance, break effect triggered
+# Section 6: Hitbox Architecture and Hit Registration
+## Capsule Anatomy
+Body Zone Table:
+Body Zone
+Connected Bone
+Radius
+Damage Multiplier
+Head
+Head_Bone
+12.0 cm
+4.0×
+Neck
+Neck_Bone
+8.0 cm
+4.0×
+Upper Chest
+Spine_03
+25.0 cm
+1.0×
+Stomach
+Spine_01
+22.0 cm
+1.0×
+Arms
+LowerArm_L/R
+9.0 cm
+0.85×
+Legs
+Calf_L/R
+11.0 cm
+0.85×
+Capsule-Ray Mathematics
+1. Shortest distance between bullet ray and capsule axis calculated
+2. Collision checked (distance ≤ radius)
+3. Hit point determined
+Optimization: Square root operation performed only at final step
+## Hit Priority System
+· A bullet can penetrate multiple capsules (e.g., hand then head)
+· Priority Rule: Zone with higher damage multiplier is selected
+  · Example: If both hand and head are hit, counted as headshot
+Weapon Mastery Integration
+· Headshot: +100 XP
+· Body/arm/leg hit: +50 XP
+# Section 7: Game Modes and Round Cycle
+## Main Class Architecture
+```cpp
+Class BaseGameMode {
+    Float RoundTimeLimit;
+    İnt MaxRounds;
+    Bool EnableMastery;
+    Bool EnableAbilities;
+    Bool EnableEconomy;
+    
+    Virtual void OnRoundStart();
+    Virtual void OnPlayerDeath();
+    Virtual void CheckWinCondition();
+};
+```
+“Sphere” (Bomb) Mechanics
+· Plant Time: 4.0 seconds
+· Defuse Time: 7.0 seconds (3.5s with kit)
+· Detonation Timer: 45 seconds
+· Kill Radius: 35 meters
+State Machine: Idle → Planting → Active → Defusing → Exploded/Defused
+Mode 1 & 2: Ranked and Fast & Fight
+Comparison Table:
+Feature
+Ranked
+Fast & Fight
+Target
+13 Rounds
+10 Rounds
+Round Duration
+1:45 min
+1:30 min
+Economy Multiplier
+1.0×
+1.5×
+Starting Money
+800
+2000
+Rank Effect
+Yes
+No
+Side Swap
+Round 12
+Round 9
+Pistol Rounds
+1st and 13th
+1st and 10th
+Round Flow:
+1. Buy Phase: 20 seconds
+2. Action Phase: Main game time
+3. End Phase: 5-7 seconds
+Economy System:
+· Maximum Money: 9,000 (Ranked) / 12,000 (Fast)
+· Kill Reward: 200
+· Sphere Plant/Defuse: +300 (to team)
+· Round Win: +3,000
+· Round Loss: +1,900 (increases with loss streak)
+Mode 3: Duel (Chaos Mode)
+· Structure: 5 Teams × 2 Players = 10 Players
+· Win Condition: First team to reach 100 kills
+· Time Limit: 10 minutes (highest score wins)
+· Abilities/Mastery: DISABLED
+· Respawn: After 3 seconds, at safe location
+Mode 4: Solo / Kill (1v1 Tournament)
+· Structure: 5v5 (individual duels)
+· Abilities/Mastery: DISABLED
+· Game Cycle: 10 Rounds
+· Mechanic: Each round, two players teleported to arena, others spectate
+· Win Condition: Team with most round wins
+# Section 8: Character Classes and Ultimate Systems
+General Rules:
+· Ultimate: Requires 100% charge to activate
+· Charge Gain: Kill (+15%), Assist (+10%)
+· Pistol Rounds: Ultimate cannot be used or charged
+Character Roster:
+Jacob (The Anchor)
+· Role: Defense/Strategy
+· Ultimate: Siege Breaker
+· Effect: Bullets passing through selected wall lose no damage
+· Duration: Current round + next round
+· Area: 3m × 3m square
+Lagrange (The Flanker)
+· Role: Duelist/Mobility
+· Ultimate: Quantum Rewind
+· Effect: Teleports to location of last killed enemy
+· Restriction: Must be used within 15 seconds of kill
+· Protection: Invulnerable for 1 second after teleport
+Sentinel (The Support)
+· Role: Information/Control
+· Ultimate: Panopticon
+· Effect: Totem reveals enemies within 30m radius
+· Totem HP: 150 HP
+· Duration: Until destroyed or 25 seconds
+Sector (The Controller)
+· Role: Area Control
+· Ultimate: Doomsday Charge
+· Effect: Sticky bomb (explodes after 2 seconds)
+· Damage: 150 (0-2m), linear falloff (2-8m)
+· Crouch Bonus: Damage reduced by 50%
+Silvia (The Buffer)
+· Role: Support/Tempo
+· Ultimate: Overdrive Core
+· Effect: 60m long energy tunnel
+· Ally Bonus: Movement speed ×1.3, Fire rate ×1.15
+· Enemy Penalty: Movement speed ×0.6
+· Duration: 8 seconds (+2s per kill during ultimate)
+Samuel (The Gambler)
+· Role: Risk/Aggressive
+· Ultimate: Blood Pact
+· Effect: Bullets cost HP, kills restore HP
+· Cost: -5 HP per shot
+· Reward: +50 HP per kill (overheal possible)
+· Critical State: HP ≤ 30 gives 1.3× damage multiplier
+Jielda (The Hunter)
+· Role: Crowd Control
+· Ultimate: Spirit Wolves
+· Effect: Sends wolves to first 3 damaged enemies
+· Wolf Effect: 1.5 second stun
+· Limit: Maximum 3 targets
+Zauhll (The Stalker)
+· Role: Stealth/Flank
+· Ultimate: Void Walk
+· Effect: Complete invisibility
+· Restriction: Can only see 3m ahead
+· Bonus: Movement speed +25%
+· Duration: 7 seconds
+· First Hit: 100% lifesteal on first hit out of invisibility
+Volt (The Disruptor)
+· Role: Chaos/Global
+· Ultimate: System Failure
+· Effect: Blackout affecting all players
+· Vision Range: 5 meters
+· UI Effect: Minimap, health bar, scoreboard hidden
+· Audio: Team voice chat unavailable
+· Duration: 5 seconds
+Sai (The Duelist)
+· Role: Close Combat
+· Ultimate: Blade Dance
+· Effect: 3 sword strikes
+· Strikes 1-2: 4m range, 75 damage, blocks incoming bullets
+· Strike 3: 6m range, 3 second root, reveals position
+Helix (The Intel)
+· Role: Psychological Pressure
+· Ultimate: One-Way Mirror
+· Effect: One-way window (2m × 1.5m)
+· Helix Side: Clear vision
+· Enemy Side: Sees opaque, wavy energy
+· Duration: 12 seconds
+· Passive: +25 HP for kills from behind window
+Kant (The Thief)
+· Role: Flexible
+· Ultimate: Echo
+· Effect: Steals ultimate from dead player
+· Range: Must be within 3m of corpse
+· Usage Time: 5 seconds to use stolen ultimate
+Marcus 2.0 (The Acrobat)
+· Role: Mobility/Initiator
+· Ultimate: Grapple Strike
+· Effect: Physics-based grappling hook
+· Range: 25 meters
+· On Wall: Pulls player to point
+· On Enemy: 25 damage, 40% slow (3s)
+· Passive: No fall damage while ultimate is active
+# Section 9: Data-Driven Map System
+Coordinate System
+· Center (0,0,0): Map midpoint
+· Unit: 1 Unit = 1 Centimeter
+· Directions: +Z (Up), +Y (North/Forward), +X (East/Right)
+JSON Map Data Structure
+```json
+{
+  “map_id”: “map_temple_v1”,
+  “map_name”: “Ancient Temple”,
+  “bounds”: { “min”: [-3000, -3000, -500], “max”: [3000, 3000, 1000] },
+  “sites”: [
+    { “id”: “A”, “center”: [1500, 2000, 0], “radius”: 400 },
+    { “id”: “B”, “center”: [0, 500, 0], “radius”: 350 },
+    { “id”: “C”, “center”: [-1500, 2000, 0], “radius”: 400 }
+  ],
+  “spawn_points”: {
+    “attackers”: [ { “pos”: [0, -2500, 0], “rot”: [0, 0, 0] } ],
+    “defenders”: [ { “pos”: [1500, 2500, 0], “rot”: [0, 180, 0] } ]
+  },
+  “buy_zones”: [
+    { “team”: “attacker”, “bounds_min”: [-500, -2600, 0], “bounds_max”: [500, -2400, 200] }
+  ]
+}
+```
+Dynamic Site Logic
+· Dynamic number of sites (2 or 3 sites)
+· Sphere planting checks all sites
+· Player plants at whichever site they’re inside
+Spawn Point Management
+· Spawn points in JSON are shuffled
+· First 5 points assigned to players
+· Different spawn points each round
+Barrier System
+· Invisible walls active during buy phase
+· Disabled during action phase
+# Section 10: User Interface and HUD System
+Drawing Architecture
+· Screen Coordinates: Top Left (0,0) → Bottom Right (1.0, 1.0)
+· Anchor Logic: Consistent appearance across resolutions
+HUD Components
+Crosshair
+· Screen center (0.5, 0.5)
+· Dynamic spread:
+  ```
+  CurrentGap = BaseGap + (PlayerVelocity × MoveError) + (Recoil × FireError)
+  ```
+· Customizable: Color, lines, opacity, dot
+Health and Armor Bar
+· Bottom center of screen
+· Health Bar: Green/White, 0-100
+· Armor Bar: Blue/Gray, 0-50 (above health)
+· Damage Effect: Lost portion turns red, slowly decreases
+Ability and Ultimate Status
+· 4 slots below health bar
+· Ultimate Icon: Circle, changes based on charge
+  · 0-99%: Gray, filling circle
+  · 100%: Glowing, pulsing colored icon
+  · Active: Countdown ring
+Ammo and Weapon Mastery
+· Bottom right corner
+· Ammo: Large font (e.g., 30 / 90)
+  · Turns red below 20%
+· Mastery: “LVL IV” above weapon icon
+· XP Bar: Thin line below ammo
+Minimap
+· Method: Vector drawing (not Render Texture)
+· Transformation Formula:
+  ```
+  MapX = (PlayerX – MinX) / (MaxX – MinX) × MinimapSize
+  ```
+· Vision Cone: Transparent triangle showing player’s facing direction
+· Fog of War: Unseen enemies not shown on minimap
+· Firing Enemy: Visible on minimap for 0.5 seconds
+Scoreboard (TAB Menu)
+· Rows: 5 friendly, 5 enemy
+· Columns:
+  1. Ping (ms)
+  2. Character icon
+  3. Player name
+  4. K/D/A
+  5. Ultimate status (friendly: visible, enemy: hidden)
+  6. Economy (friendly: visible, enemy: hidden)
+Killfeed
+· Top right corner
+· Format: [Killer] [Weapon Icon] [Victim]
+· Headshot: Red + skull icon
+· Wallbang: Wall icon
+· Highlight: Your actions have glowing background
+Full-screen Effects
+· Flashbang: White screen, alpha slowly decreases
+· Volt Ultimate: HUD elements hidden, screen glitches
+· Low Health: Below 20% HP, red vignette at screen edges with pulse effect
+Buy Menu
+· B Key to open
+· Left: Weapons
+· Right: Equipment/Armor
+· Stats Panel: Hover over weapon to show damage graph, penetration power, mastery info
+# Section 11: 3D Spatial Audio Engine
+## Distance and Attenuation
+```
+Gain = ReferenceDistance / (ReferenceDistance + (Distance × RolloffFactor))
+```
+· ReferenceDistance: 100% sound (e.g., 1 meter)
+· RolloffFactor: How quickly sound fades
+· Maximum Range: Not processed if gain < 0.01
+3D Positioning
+· Pan Calculation: Pan = SoundVector · RightVector
+  · 1.0: Far right
+  · -1.0: Far left
+  · 0.0: Center
+· Front/Back Differentiation: Rear sounds filtered with low-pass
+Dynamic Occlusion
+· Raycast between sound source and listener
+· No Obstruction: Occlusion = 0.0
+· Obstruction Present: Value based on material
+  · Wood: 0.4
+  · Concrete: 0.7
+  · Metal: 0.9
+Filter Effect:
+```
+CutoffFrequency = 22000Hz × (1.0 – Occlusion)
+```
+· No obstruction: 22kHz (full sound)
+· Concrete wall: 6kHz (muffled sound)
+## Material-based Footsteps
+Sound Profile Table:
+```cpp
+Enum class SurfaceType { Concrete, Wood, Metal, Grass, Water };
+Struct FootstepProfile {
+    List<AudioClip> WalkSounds;
+    List<AudioClip> RunSounds;
+    List<AudioClip> LandSounds;
+};
+```
+Speed and Stealth:
+· Running (>200): RunSounds, 40m radius
+· Walking (<130): WalkSounds, 15m radius
+· Crouching: No sound played
+## Prioritization System
+Channel Priority Order:
+1. Critical: Sphere, headshot, own damage sound
+2. Voice Comms: Team chat
+3. Ultimate Cues: “Fire in the hole!”
+4. Combat: Weapon sounds, explosions
+5. Footsteps
+6. Ambience: Wind, birds, map hum
+Rule: If Channel 1 or 3 is active, volume of Channels 4-6 reduced by 40%
+Document End
+This document covers all technical and design details of Project Z. Systems are designed to work together seamlessly, aiming to provide a balanced and competitive gaming experience.
+Document Version: 1.0
+Last Updated: 21.01.2026
+Prepared by: Emirhan / My Lotus Team

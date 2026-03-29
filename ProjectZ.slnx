@@ -1,0 +1,8 @@
+﻿<Solution>
+  <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="SidekickCharacters.Editor.csproj" />
+  <Project Path="SidekickCharacters.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="Gilzoide.SqliteNet.csproj" />
+  <Project Path="Gilzoide.SqliteNet.Tests.Editor.csproj" />
+</Solution>
