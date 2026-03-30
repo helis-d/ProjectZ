@@ -47,6 +47,54 @@ stateDiagram-v2
 
 ---
 
+## 📈 Dynamic Weapon Mastery System
+
+One of ProjectZ's most innovative features is its **Dynamic Weapon Mastery** loop. It is a live, in-match progression system where a player's mechanical performance directly impacts the physical attributes of their held weapon. 
+
+If a player executes flawless headshots, their weapon levels up rapidly, unlocking faster reload times and tighter ADS (Aim-Down-Sights) speeds. However, if a player performs poorly or dies repeatedly, their weapon *loses* XP and its performance degrades mid-round.
+
+### 🌟 Mastery XP Logic 
+The system spans from **Level I** (0 XP) to **Level V** (4000+ XP). Each level threshold requires 1000 XP.
+
+| Combat Action | Target/Condition | XP Modifier | System Rationale |
+| :--- | :--- | :---: | :--- |
+| **Kill** | Headshot | <font color="#2ECC71"><b>+100 XP</b></font> | Maximally rewards pinpoint mechanical precision. |
+| **Kill** | Body / Leg | <font color="#3498DB"><b>+50 XP</b></font> | Standard combat elimination reward. |
+| **Assist** | Armor & HP Damaged | <font color="#9B59B6"><b>+50 XP</b></font> | Rewards heavy contribution to a teammate's frag. |
+| **Assist** | HP Only | <font color="#1ABC9C"><b>+25 XP</b></font> | Minor assist contribution or shield break. |
+| **Utility** | Ultimate Cast | <font color="#F1C40F"><b>+50 XP</b></font> | Rewards active execution of team-based abilities. |
+| **Death** | Body / Leg | <font color="#E74C3C"><b>-25 XP</b></font> | Standard penalty for losing a duel. |
+| **Death** | Headshot | <font color="#C0392B"><b>-40 XP</b></font> | Harshly penalizes being out-aimed by an opponent. |
+| **Penalty** | Cold Streak | <font color="#34495E"><b>-60 XP</b></font> | Triggers if the player secures 0 kills in 3 consecutive rounds. |
+
+### ⚙️ Progression Flow & Stat Buffs
+Buffs drastically alter how a weapon *feels* without directly changing its TTK (Damage never increases, only handling/utility metrics). For instance, an Assault Rifle maxed at Level V gains a massive 15% Fire Rate boost, whereas a Max Level Sniper gains a 30% faster ADS speed.
+
+```mermaid
+graph TD
+    classDef Event fill:#2c3e50,stroke:#34495e,stroke-width:2px,color:#fff;
+    classDef Success fill:#27ae60,stroke:#2ecc71,stroke-width:2px,color:#fff;
+    classDef Fail fill:#c0392b,stroke:#e74c3c,stroke-width:2px,color:#fff;
+    classDef Level fill:#8e44ad,stroke:#9b59b6,stroke-width:2px,color:#fff;
+
+    A[Player Engages in Duel]:::Event
+    A -->|Secures Headshot| B(+100 XP):::Success
+    A -->|Dies to Headshot| C(-40 XP):::Fail
+    
+    B --> D{Hits 2000 XP Threshold?}:::Event
+    C --> E{Drops Below 2000 XP?}:::Event
+    
+    D -->|Yes| F((Levels Up to Level III)):::Level
+    E -->|Yes| G((De-levels to Level II)):::Fail
+    
+    F -->|Apply Buffs| H[15% Faster Reload Speed applied live!]:::Success
+    G -->|Strip Buffs| I[Return to Standard Reload Speed]:::Event
+```
+
+*Note: Dropping a weapon completely wipes its Mastery XP. A newly picked-up weapon by any player will automatically reset to Level I.*
+
+---
+
 ## 🦸 The Roster (13 Playable Agents)
 
 ProjectZ features 13 canonical Agents divided into strategic roles. Ultimate abilities require 100% charge to activate (earned via kills and assists) and are disabled during Pistol Rounds for pure mechanical balance.
