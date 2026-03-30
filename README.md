@@ -68,11 +68,42 @@ The system spans from **Level I** (0 XP) to **Level V** (4000+ XP). Each level t
 | **Griefing** | Sabotage/Toxic | <font color="#C0392B"><b>-85 XP</b></font> | Manual penalty applied for negative behavior. |
 
 ### ⚙️ Progression Flow & Stat Buffs
-Buffs are systematically categorized by weapon class scaling multipliers at maximum level (Level V).
-*   **Assault Rifles:** Gains +15% Fire Rate.
-*   **SMGs:** Gains +25% Reload Speed focused on rapid mobility.
-*   **Snipers:** Gains +30% faster ADS execution speed.
-*   **Pistols:** Gains an astonishing +50% weapon draw/swap speed.
+Buffs are systematically categorized by weapon class scaling multipliers. Advancing a weapon class modifies how it handles physically in combat, drastically improving utility without fundamentally altering its base Damage outputs.
+
+**1. Assault Rifles (Balanced Lethality)**
+*   **Level 1 (0 XP):** Base Stats
+*   **Level 2 (1000 XP):** <font color="#3498DB"><b>+10%</b></font> ADS (Aim-Down-Sights) Speed
+*   **Level 3 (2000 XP):** <font color="#3498DB"><b>+15%</b></font> Reload Speed
+*   **Level 4 (3000 XP):** <font color="#3498DB"><b>+5%</b></font> Movement Speed
+*   **Level 5 (Max):** <font color="#F1C40F"><b>+15%</b></font> Fire Rate
+
+**2. Submachine Guns / SMGs (Hyper-Mobility)**
+*   **Level 1 (0 XP):** Base Stats
+*   **Level 2 (1000 XP):** <font color="#3498DB"><b>+5%</b></font> Movement Speed
+*   **Level 3 (2000 XP):** <font color="#3498DB"><b>+10%</b></font> Fire Rate
+*   **Level 4 (3000 XP):** <font color="#3498DB"><b>+15%</b></font> ADS Speed
+*   **Level 5 (Max):** <font color="#F1C40F"><b>+25%</b></font> Reload Speed
+
+**3. Sniper Rifles (Angle Dominance)**
+*   **Level 1 (0 XP):** Base Stats
+*   **Level 2 (1000 XP):** <font color="#3498DB"><b>+10%</b></font> Reload Speed
+*   **Level 3 (2000 XP):** <font color="#3498DB"><b>+15%</b></font> Weapon Draw Speed
+*   **Level 4 (3000 XP):** <font color="#3498DB"><b>+5%</b></font> Movement Speed
+*   **Level 5 (Max):** <font color="#F1C40F"><b>+30%</b></font> ADS Speed
+
+**4. Sidearms / Pistols (Desperation Swaps)**
+*   **Level 1 (0 XP):** Base Stats
+*   **Level 2 (1000 XP):** <font color="#3498DB"><b>+10%</b></font> Movement Speed
+*   **Level 3 (2000 XP):** <font color="#3498DB"><b>+15%</b></font> Reload Speed
+*   **Level 4 (3000 XP):** <font color="#3498DB"><b>+20%</b></font> Fire Rate
+*   **Level 5 (Max):** <font color="#F1C40F"><b>+50%</b></font> Weapon Draw/Swap Speed
+
+**5. Shotguns (Breaching Power)**
+*   **Level 1 (0 XP):** Base Stats
+*   **Level 2 (1000 XP):** <font color="#3498DB"><b>+10%</b></font> Movement Speed
+*   **Level 3 (2000 XP):** <font color="#3498DB"><b>+15%</b></font> Faster Pump/Action animation execution
+*   **Level 4 (3000 XP):** <font color="#3498DB"><b>+20%</b></font> Reload Speed
+*   **Level 5 (Max):** <font color="#F1C40F"><b>+15%</b></font> Fire Rate
 
 ```mermaid
 graph TD
