@@ -13,17 +13,18 @@
 
 ## 📖 Lore & Setting
 
-Set in a near-future cyberpunk metropolis fractured by the discovery of "Z-Energy"—a paradoxical substance capable of bending time, space, and local physics—clandestine factions deploy highly specialized agents ("Heroes") to secure extraction zones. It is a tactical war of information, precision, and ultimate abilities.
+Set in a near-future cyberpunk metropolis fractured by the discovery of "Z-Energy"—a paradoxical substance capable of bending time, space, and local physics—clandestine factions deploy highly specialized agents ("Heroes") to secure extraction zones. It is a tactical war of information, precision, and ultimate abilities governed by global supremacy.
 
 ---
 
 ## 🎮 Core Gameplay Loop
 
-ProjectZ follows a highly structured, competitive **Round-Based Economy** loop:
-1. **Buy Phase:** Players use credits earned from kills, assists, and round outcomes (Win/Loss/Loss-Streak) to purchase weapons, armor, and abilities natively through the `BuyMenuUI`.
-2. **Combat Phase:** A lethal 5v5 engagement. Time-to-Kill (TTK) is extremely low. A single well-placed headshot from a Heavy Assault Rifle is fatal.
-3. **Objective (The Sphere):** The Attacking team must plant the **Sphere** at designated Sites (A, B, or C). The Defending team must hold the sites, defuse the Sphere, or eliminate all attackers.
-4. **Round End & Progression:** The `RoundManager` tabulates ELO, distributes XP, updates the `ScoreboardUI`, and seamlessly transitions players to the next round.
+ProjectZ strictly follows a high-stakes, competitive **Round-Based Economy** loop.
+
+1. **Buy Phase (20 seconds):** Players use credits earned from kills (200 cr), objectives (300 cr), round wins (3000 cr), and round losses (base 1900 cr scaling with losing streaks) to purchase weapons, armor, and abilities natively through the `BuyMenuUI`. Economy maximum is capped at 9000 credits for Ranked matches.
+2. **Combat Phase (1:45 min):** A lethal 5v5 engagement. Time-to-Kill (TTK) is extremely low. A single well-placed headshot generally results in instant elimination.
+3. **Objective (The Sphere):** The Attacking team must plant the **Sphere** at designated Sites (A, B, or C). Planting requires 4.0 seconds. The Sphere has a 45-second detonation timer. The Defending team must defuse it (7.0 seconds base, 3.5 seconds with a kit). The explosive kill radius upon detonation spans 35 meters.
+4. **Round End & Progression:** The `RoundManager` tabulates ELO, updates the Scoreboard, and handles phase transitions. Match structure ranges from 13 rounds (Ranked) to 5 rounds (Fast-Fight).
 
 ```mermaid
 stateDiagram-v2
@@ -49,9 +50,7 @@ stateDiagram-v2
 
 ## 📈 Dynamic Weapon Mastery System
 
-One of ProjectZ's most innovative features is its **Dynamic Weapon Mastery** loop. It is a live, in-match progression system where a player's mechanical performance directly impacts the physical attributes of their held weapon. 
-
-If a player executes flawless headshots, their weapon levels up rapidly, unlocking faster reload times and tighter ADS (Aim-Down-Sights) speeds. However, if a player performs poorly or dies repeatedly, their weapon *loses* XP and its performance degrades mid-round.
+One of ProjectZ's heavily engineered features is its **Dynamic Weapon Mastery** loop. It is a live, in-match progression system where a player's mechanical performance directly impacts the physical handling metrics (Reload Speed, Fire Rate, Movement Speed, ADS Speed) of their held weapon. Damage outputs remain static globally to preserve absolute mechanical integrity.
 
 ### 🌟 Mastery XP Logic 
 The system spans from **Level I** (0 XP) to **Level V** (4000+ XP). Each level threshold requires 1000 XP.
@@ -65,10 +64,15 @@ The system spans from **Level I** (0 XP) to **Level V** (4000+ XP). Each level t
 | **Utility** | Ultimate Cast | <font color="#F1C40F"><b>+50 XP</b></font> | Rewards active execution of team-based abilities. |
 | **Death** | Body / Leg | <font color="#E74C3C"><b>-25 XP</b></font> | Standard penalty for losing a duel. |
 | **Death** | Headshot | <font color="#C0392B"><b>-40 XP</b></font> | Harshly penalizes being out-aimed by an opponent. |
-| **Penalty** | Cold Streak | <font color="#34495E"><b>-60 XP</b></font> | Triggers if the player secures 0 kills in 3 consecutive rounds. |
+| **Penalty** | Cold Streak | <font color="#34495E"><b>-60 XP</b></font> | Punishes securing 0 kills across 3 consecutive rounds. |
+| **Griefing** | Sabotage/Toxic | <font color="#C0392B"><b>-85 XP</b></font> | Manual penalty applied for negative behavior. |
 
 ### ⚙️ Progression Flow & Stat Buffs
-Buffs drastically alter how a weapon *feels* without directly changing its TTK (Damage never increases, only handling/utility metrics). For instance, an Assault Rifle maxed at Level V gains a massive 15% Fire Rate boost, whereas a Max Level Sniper gains a 30% faster ADS speed.
+Buffs are systematically categorized by weapon class scaling multipliers at maximum level (Level V).
+*   **Assault Rifles:** Gains +15% Fire Rate.
+*   **SMGs:** Gains +25% Reload Speed focused on rapid mobility.
+*   **Snipers:** Gains +30% faster ADS execution speed.
+*   **Pistols:** Gains an astonishing +50% weapon draw/swap speed.
 
 ```mermaid
 graph TD
@@ -78,130 +82,138 @@ graph TD
     classDef Level fill:#8e44ad,stroke:#9b59b6,stroke-width:2px,color:#fff;
 
     A["Player Engages in Duel"]:::Event
-    A -->|Secures Headshot| B["+100 XP"]:::Success
-    A -->|Dies to Headshot| C["-40 XP"]:::Fail
+    A -->|"Secures Headshot"| B["+100 XP"]:::Success
+    A -->|"Dies to Headshot"| C["-40 XP"]:::Fail
     
     B --> D{"Hits 2000 XP Threshold?"}:::Event
     C --> E{"Drops Below 2000 XP?"}:::Event
     
-    D -->|Yes| F(["Levels Up to Level III"]):::Level
-    E -->|Yes| G(["De-levels to Level II"]):::Fail
+    D -->|"Yes"| F(["Levels Up to Level III"]):::Level
+    E -->|"Yes"| G(["De-levels to Level II"]):::Fail
     
-    F -->|Apply Buffs| H["15% Faster Reload Speed applied live!"]:::Success
-    G -->|Strip Buffs| I["Return to Standard Reload Speed"]:::Event
+    F -->|"Apply Buffs"| H["15% Faster Reload Speed applied live!"]:::Success
+    G -->|"Strip Buffs"| I["Return to Standard Reload Speed"]:::Event
 ```
 
-*Note: Dropping a weapon completely wipes its Mastery XP. A newly picked-up weapon by any player will automatically reset to Level I.*
+*Note: Dropping a weapon completely wipes its Mastery XP memory arrays. A newly picked-up weapon by any player will automatically reset to Level I. First and Half-time Pistol Rounds explicitly disable Masteries & Ultimates.*
 
 ---
 
-## 🦸 The Roster (13 Playable Agents)
+## 🦸 The Roster (13 Canonical Playable Agents)
 
-ProjectZ features 13 canonical Agents divided into strategic roles. Ultimate abilities require 100% charge to activate (earned via kills and assists) and are disabled during Pistol Rounds for pure mechanical balance.
+ProjectZ features 13 highly tuned Agents spanning multiple architectural roles. Ultimate abilities require exactly 100% charge to activate (+15% per kill, +10% per assist).
 
 1. <font color="#E74C3C"><b>Jacob</b></font> **(The Anchor) - Defense/Strategy**
-   * **Ultimate | Siege Breaker:** Creates a definitive tactical opening. Any bullets passing through the designated 3x3m zone lose absolutely zero damage when penetrating walls for the current and subsequent round.
+   * **Ultimate | Siege Breaker:** Creates a definitive tactical opening. Any bullets Jacob fires through a designated 3x3m environmental zone lose zero damage (0% drop-off) upon penetrating walls. Lasts for the current and subsequent round.
 2. <font color="#3498DB"><b>Lagrange</b></font> **(The Flanker) - Duelist/Mobility**
-   * **Ultimate | Quantum Rewind:** A high-risk repositioning tool. Teleports Lagrange instantly to the exact location of the last enemy he killed. Must be utilized within 15 seconds of the kill and provides 1 second of invulnerability upon arrival.
+   * **Ultimate | Quantum Rewind:** A high-risk spacetime fracture. Teleports Lagrange securely to the exact coordinate of the last enemy he engaged and killed. Must be utilized immediately within 15 seconds of the kill and grants an essential 1-second invulnerability shield upon materialization.
 3. <font color="#2ECC71"><b>Sentinel</b></font> **(The Support) - Information/Control**
-   * **Ultimate | Panopticon:** Deploys a 150HP vision totem. Continuously scans a massive 30m radius, revealing the positions of any enemies caught within its line of sight until destroyed or its 25-second duration expires.
+   * **Ultimate | Panopticon:** Generates an enormous 150HP stationary vision construct. It systematically scans a monolithic 30m radius sphere, tracking any enemies within its Line-of-Sight and rendering aggressive wall-outlines highlighting them for the entire defending team. Active for 25 seconds.
 4. <font color="#9B59B6"><b>Sector</b></font> **(The Controller) - Area Control**
-   * **Ultimate | Doomsday Charge:** Fires a lethal sticky bomb that detonates after 2 seconds. Inflicts 150 damage within the epicenter (0-2m) with linear falloff up to 8 meters. Enemies caught in its radius can halve the damage by crouching.
+   * **Ultimate | Doomsday Charge:** Deploys a violently reactive sticky charge. Detonates in precisely 2.0 seconds flat. Inflicts 150 immediate damage spanning the 0-2m epicenter, decaying linearly outwards up to 8 meters. Opponents can severely mitigate the blast (50% reduction) if they react by crouching.
 5. <font color="#F1C40F"><b>Silvia</b></font> **(The Buffer) - Support/Tempo**
-   * **Ultimate | Overdrive Core:** Generates a 60-meter long energy tunnel. Allies moving through the tunnel gain 30% movement speed and a 15% fire-rate buff, while enemies are heavily penalized with a 40% movement speed slow. Duration extends per kill.
+   * **Ultimate | Overdrive Core:** Engineers an extraordinary 60-meter elongated energy vector tunnel. Any allied troops operating inside the bounds acquire a +30% Movement Speed and +15% Fire Rate steroid buff. Opponents trapped within the structure are crushed via a 40% movement speed slow decay. Initial duration is 8 seconds, gaining +2 seconds for every secured elimination.
 6. <font color="#E67E22"><b>Samuel</b></font> **(The Gambler) - Risk/Aggressive**
-   * **Ultimate | Blood Pact:** Enters a vampiric frenzy. Firing the weapon drains 5 HP per shot, but securing a kill grants 50 HP (overhealing permitted). Dropping below 30 HP grants Samuel a desperate 1.3x damage multiplier.
+   * **Ultimate | Blood Pact:** Activates an insanely aggressive vampiric contract. Depletes 5 Health Points intrinsically for every bullet fired from Samuel's weapon, however, every successful kill violently heals him for an astounding 50 HP (with mechanics supporting active overhealing). Sinking below 30 HP activates a frantic 1.3x global damage multiplier.
 7. <font color="#1ABC9C"><b>Jielda</b></font> **(The Hunter) - Crowd Control**
-   * **Ultimate | Spirit Wolves:** Unleashes ethereal wolves that autonomously track down the first 3 enemies that have taken damage this round. Upon connection, the wolves inflict a harsh 1.5-second stun. 
+   * **Ultimate | Spirit Wolves:** Manipulates ethereal constructs to summon homing, AI-controlled spirit entities. The wolves autonomously track down the first 3 enemy combatants that have registered body damage within the round. Impact ensures a devastating 1.5-second debilitating movement/aim stun.
 8. <font color="#34495E"><b>Zauhll</b></font> **(The Stalker) - Stealth/Flank**
-   * **Ultimate | Void Walk:** Shifts completely into the Void. Grants total invisibility and a +25% movement speed boost for 7 seconds, at the cost of restricting vision severely to 3 meters. The first strike out of stealth has 100% lifesteal.
+   * **Ultimate | Void Walk:** Phased entirely beyond the physical 3D dimension. Converts Zauhll into 100% true invisibility parameter status combined with a monumental +25% sprint capacity. The caveat forces Zauhll’s render vision cone to be agonizingly compressed to merely 3 meters directly forward for 7 seconds. Exiting stealth to land a first-hit guarantees 100% active weapon lifesteal recovery.
 9. <font color="#F39C12"><b>Volt</b></font> **(The Disruptor) - Chaos/Global**
-   * **Ultimate | System Failure:** A global blackout. Instantly restricts enemy vision to 5 meters, hides all HUD elements (Minimap, Health bar, Scoreboard), and completely disables enemy team voice chat for 5 seconds.
+   * **Ultimate | System Failure:** Executes algorithmic chaos via an electronic EMP field spanning the servers. Forcefully compresses all enemy viewports to a catastrophic 5-meter boundary, deletes all HUD instances (Health bars, Crosshairs, Scoreboards, Ammo interfaces) and comprehensively mutes enemy internal VOIP (Voice Chat) for 5 punishing seconds.
 10. <font color="#D35400"><b>Sai</b></font> **(The Duelist) - Close Combat**
-    * **Ultimate | Blade Dance:** Transitions to a lethal melee stance for three targeted strikes. Strikes 1 and 2 cover 4 meters, dealing 75 damage while passively blocking incoming bullets. Strike 3 extends to 6 meters, dealing massive damage and rooting the target.
+    * **Ultimate | Blade Dance:** Binds close-quarters combat logic to executing 3 highly targeted physical dashes. Strikes 1 and 2 lock targets within 4 meters, dealing 75 static damage while deploying a forward-facing kinetic barrier that completely nullifies incoming projectiles. The final 3rd Strike dramatically extends to a 6-meter lock, landing a 3-second crippling root condition.
 11. <font color="#8E44AD"><b>Helix</b></font> **(The Intel) - Psychological Pressure**
-    * **Ultimate | One-Way Mirror:** Deploys a 2x1.5m tactical window. Helix's team sees clearly through the glass, while the enemy side observes an opaque, wavy energy shield. Helix heals 25 HP for every kill secured from behind the glass.
+    * **Ultimate | One-Way Mirror:** Deploys an asymmetrical logic barrier measuring exactly 2.0x1.5 meters. Helix and allied entities process visual rendering cleanly through the plane entirely unobstructed, while opposition raycasts only perceive an intensely opaque, wavy energy shield. Helix sustains a +25 HP recovery condition for orchestrating combat sequences securely behind the mirror boundary.
 12. <font color="#C0392B"><b>Kant</b></font> **(The Thief) - Flexible**
-    * **Ultimate | Echo:** The ultimate wildcard. Kant approaches any dead player's corpse (within 3m) and permanently steals their designated Ultimate ability, with 5 seconds given to cast the stolen power.
+    * **Ultimate | Echo:** A profoundly terrifying psychological mechanic allowing total flexibility. By approaching any expired combatant’s capsule (friendly or hostile within a 3-meter vicinity), Kant physically extracts and overrides their specific Ultimate script. Kant has a strictly enforced 5-second countdown to unleash the stolen capability.
 13. <font color="#2980B9"><b>Marcus 2.0</b></font> **(The Acrobat) - Mobility/Initiator**
-    * **Ultimate | Grapple Strike:** Fires a physics-based, 25-meter grappling hook. If attached to geometry, pulls Marcus dynamically. If attached to an enemy, deals 25 damage, pulls them, and applies a devastating 40% slow for 3 seconds. Fall damage is negated while active.
+    * **Ultimate | Grapple Strike:** Shoots a fully unadulterated, physics-influenced 25-meter kinetic grappling wire. Impacting terrestrial geometry pulls Marcus vigorously via angular momentum towards the point. Hooking a player organically pulls them into a staggered arrangement, inflicts 25 flat damage, and initiates a brutal 40% slow metric spanning 3 seconds. Gravity damage matrices are entirely bypassed (No Fall Damage) across the sequence duration.
 
 ---
 
-## ⚙️ In-Depth Gunplay Mechanics
+## ⚙️ In-Depth Mechanics & Physics Engine
 
-ProjectZ takes weapon mastery to an obsessive level. Our custom mechanics demand pinpoint accuracy, strict movement discipline, and deep systemic knowledge. 
+ProjectZ demands pinpoint accuracy, strict situational movement vectors, and deep systemic awareness to achieve the lowest possible TTK efficiently on the servers.
 
-### 🎯 Advanced Recoil & Ballistics
-Unlike random-spread shooters, ProjectZ relies on **Procedural Patterning**.
-* **Deterministic Spray Patterns:** Sustained fire pushes the weapon vertically before pulling horizontally into structured, learnable shapes.
-* **First-Shot Accuracy & Bloom:** The first bullet is laser-accurate when stationary. Firing rapidly increases "Bloom" (spread cone radius). The dynamic `CrosshairUI` physically expands relative to the current Bloom threshold.
-* **Camera Kick:** True physical kickback is applied to the player's camera matrix. Controlling a spray requires actively pulling down the mouse to counteract the mathematical Camera Shake algorithm.
+### 📐 Anatomy & Hitbox Mathematics (`HitboxCapsule`)
+Network body structures are rigorously defined with hierarchical damage logic.
+*   **Head/Neck Bone:** 12.0cm radius (Neck 8.0cm). Triggers a massive `4.0x Damage Multiplier`.
+*   **Torso Zones:** Spine_01/03 structure mapping spanning 22.0cm to 25.0cm radiuses. Regarded as `1.0x Base Modifiers`.
+*   **Extremity Volumes:** Limbs (Calfs/Arms) carry `0.85x Damage Multipliers` requiring significantly more bullets to kill.
+*   *Optimization Layer:* Fast Distance-to-Axis checks evaluate bullet-collisions, and square-roots are calculated strictly locally at final processing validation.
 
-### 🏃‍♂️ Movement Discipline & Counter-Strafing
-* **Velocity-Based Inaccuracy:** Shooting while sprinting or jumping guarantees your bullet will miss. Firing while walking slightly mitigates spread, but optimal accuracy requires absolute stillness.
-* **Counter-Strafing:** Hitting the opposite movement key (e.g., holding `D` while moving `A`) instantly zeroes out horizontal velocity, snapping the player into perfect accuracy immediately. 
-* **Audio Masking:** Sprinting creates loud, directional audio footsteps audible through walls. Holding the walk key (Shift) completely masks footstep sounds at the cost of movement speed.
+### 🎯 Advanced Recoil, Spread, and Ballistics
+Ammunition logic is handled primarily via High-Velocity Vector Rays (`P(t) = Origin + Direction * t`).
+* **Deterministic Spray Patterns:** Sustained fire kicks the `PlayerCamera` organically before shifting laterally in purely calculated and fully memorizable patterns based off weapon instances.
+* **Dynamic Crosshair Bloom:** Crosshairs calculate UI scaling formulas combining Base Gap values + Player Velocity variations + Current Output Firing Errors simultaneously.
 
-### 🧱 Wallbanging & Material Penetration
-Every surface is assigned a `SurfaceMaterial` (Wood, Stone, Metal).
-* Bullets utilize raycast-chaining to penetrate geometry. 
-* **Damage Drop-off:** A bullet passing through Wood may retain 80% damage, while a bullet passing through Metal might only retain 15%. 
-* High-caliber Heavy Snipers penetrate multiple walls easily, while Light Pistols are stopped entirely by a single layer of Stone.
+### 🏃‍♂️ Counter-Strafing & Movement Paradigms
+* Firing sequences initialized while a player maintains a Sprint (>200 speed) or Walk state drastically increases positional recoil arrays.
+* Activating counter-strafing parameters (e.g. depressing 'D' while velocity leans 'A') mathematically zeroes movement vectors instantly ensuring the ultimate accuracy recovery.
 
-### 🌐 Server-Authoritative Lag Compensation
-Since ProjectZ utilizes FishNet v4 Client-Side Prediction:
-* **Hitbox Rewinding:** Because of network ping, what a player sees on their screen is slightly outdated. When a player fires, the server takes the exact timestamp of their shot, *rewinds* the physical colliders (`HitboxCapsules`) of all enemies back in time to where they were at that specific millisecond, calculates the collision, and then fast-forwards them back.
-* **Anti-Peeker's Advantage:** This system guarantees aggressive holding angles and peeking are balanced fairly, regardless of minor ping differences. "What you see is what you hit."
+### 🧱 Wallbanging & Spatial Material Penetration Algorithms
+Surfaces in ProjectZ contain heavy contextual density metadata calculating Damage Falloff.
+*   **Metal Systems:** Are entirely impenetrable (0.0 penetration power) maintaining Infinite Resistance arrays.
+*   **Stone Bounds:** Cost 2.5 Resistance per penetrated centimeter (Capped at maximum dense limits of 30.0 cm).
+*   **Wood Objects:** Highly malleable; consuming minimal bullet damage (0.8 Resistance calculations for every centimeter traversing outwards to 60.0 cm limits).
+*   *Wallbang Logic*: A high-fidelity Heavy Sniper bullet penetrating standard Wood obstacles inherently limits target destruction to approx. 80% capability via Ray Marching equations compared to transparent impacts.
+
+---
+
+## 🎧 Advanced 3D Spatial Audio Engine Architecture 
+Awareness dictates operational dominance. The engine parses sounds deeply contextually.
+
+*   **Dynamic Raycast Occlusion:** Audio engine shoots a direct line connecting Audio Source to Player Context Camera. If a line meets Concrete, High Frequencies are severely aggressively clamped (`Occlusion = 0.7`), simulating a muffled presence compared to un-occluded transparent soundscapes.
+*   **Material Footsteps:** Terrain parsing allocates specific Sound Arrays (Gravel vs Wood vs Water). Sneaking (Shift Key) reduces movement velocity explicitly <130, restricting footstep broadcast radiuses to an imperceptible 15m context vs the standard 40m bounding box of running strides.
+*   **Audio Channel Prioritization Logic:** If the Engine plays Critical Channels (Headshot sounds, The Sphere Beeps) or Ultimate Callouts (*"Fire in the Hole!"*), lower hierarchy audio streams (Wind Ambiance, Raw Gunfire, Secondary footsteps) are instantly ducked mathematically by 40% volume internally preventing severe auditory clutter across critical moments.
+
+---
+
+## 🌐 Netcode: Server-Authoritative Lag Compensation (FishNet v4)
+Engineered for eSports integrity demanding complete fairness and security validation. ProjectZ relies on **Client-Side Prediction (CSP) & True Server Reconciliation**.
+
+*   **Hitbox Rewinding Logic:** When calculating shots from environments harboring Latency/Ping, visual feedback naturally feels slightly divergent. To rectify this, hitting the trigger broadcasts exact Local Timestamps within `ServerRpc` network queues. The authority Fishnet Server extracts the data, literally shifting the colliders of every participant backwards internally across milliseconds to physically match the shooter's specific timeframe logic before calculating boolean intersection rules.
+*   **Entity Interpolation Algorithms:** Network instances observe opponent movement completely free from jitter arrays utilizing heavy dense linear interpolating variables buffering exact opponent representations locally. 
+*   **Bit-Packing Position Data:** Network limits are mitigated by compressing vectors down drastically (eg `CompressedValue = ((WorldPos - MinMap) / (MaxMap - MinMap)) * 65535`) assuring incredibly light UDP packet configurations maintaining high Tick Rates reliably.
 
 ```mermaid
 sequenceDiagram
-    participant C as Client (Player)
-    participant S as Server (FishNet)
-    participant E as Enemy (Target)
+    participant C as Game Client (Target 40ms)
+    participant S as FishNet Auth Server Context
+    participant E as Enemy Bounding Client Context
     
-    C->>C: Input (Shoot)
-    C->>C: CSP: Play Muzzle Flash & Recoil
-    C->>S: ServerRpc: FireWeapon(TimeStamp)
+    C->>C: Input Logic (Left Click Action)
+    C->>C: CSP Rendering: Play Camera Shake & VFX
+    C->>S: ServerRpc: ProcessFireRoutine(Local TimeStamp)
     activate S
-    S->>S: Validate Fire Rate & Ammo
-    S->>E: Rewind Hitbox to TimeStamp
-    S->>S: Raycast Check Collision
-    S->>E: Fast-Forward Hitbox
-    S-->>C: ObserverRpc: Apply Damage & Blood VFX
+    S->>S: Sequential Validation (Ammo / Rate / Speedhacks)
+    S->>E: Displace Enemy Hitbox to Match Client TimeStamp
+    S->>S: Boolean Physics Collision Raycast Detection
+    S->>E: Restore Enemy Hitbox to Present Active Topology
+    S-->>C: ObserverRpc: Apply Hit Confirmation UI Vectors
     deactivate S
 ```
 
 ---
 
-## 🔫 Arsenal Categories
-
-* **Assault Rifles:** Heavy Rifle (1-tap headshots, high recoil), Tac-Rifle (Suppressed, high fire-rate), Burst Rifle (3-round burst), Semi-Auto Marksman.
-* **Sniper Rifles:** Heavy Sniper (1-hit kill to torso, extreme movement penalty), Light Sniper (fast cyclic rate), Fast-Bolt Sniper.
-* **Shotguns & SMGs:** Auto-Shotgun, Pump-Action Shotgun.
-* **Sidearms:** Standard Issue Pistol (Right-click burst), Stealth Pistol, Heavy Revolver, Machine Pistol, Sawed-off.
-* **Melee:** Tactical Knife, Karambit, Butterfly. Includes heavy/light attack delays and unique inspect animations.
-
----
-
 ## 🕹️ Game Modes
 
-ProjectZ supports a diverse suite of network-synchronized game modes via the `BaseGameMode` architecture:
-1. **Ranked (Standard):** First to 13 rounds. Win-by-two overtime rules. Strict economy.
-2. **Fast Fight:** First to 5 rounds. Max credits every round.
-3. **Duel Chaos:** A hectic **2v2v2v2v2 (5 teams of 2)** continuous deathmatch. Instant respawns and a 10-minute cap. The first duo to reach 100 kills claims victory. Abilities and economy are disabled.
-4. **Solo Tournament:** A gladiator-style **1v1 Arena**. The standard 5v5 lobby splits into spectators and combatants. Attackers and Defenders queue up for 1v1 duels at the center stage. The first team to lock in 6 duel victories wins the match.
+ProjectZ supports a diverse suite of network-synchronized game modes via the `BaseGameMode` architecture context:
+1. **Ranked (Standard):** First to 13 rounds. Win-by-two overtime rules. Strict economy thresholds capping at 9,000 maximum funds. 
+2. **Fast Fight:** First to 5 rounds. Max 12,000 credits allocated immediately every consecutive round ignoring standard multiplier logic frameworks.
+3. **Duel Chaos:** A hectic **2v2v2v2v2 (5 teams of 2)** continuous deathmatch model. Instant algorithmic respawns (3.0s delays) spanning 10-minutes. The designated duo reaching 100 combat kills claims extreme victory. Masteries completely stripped. 
+4. **Solo Tournament:** A gladiator-style **1v1 Arena Framework**. 5v5 lobby segments intelligently into specific observer states while Attackers and Defenders continuously queue for rotating synchronized individual 1v1 sequences center-stage until the designated organization secures 6 victories locking down the match entirely.
 
 ---
 
-## 🏗️ Technical Architecture 
+## 🏗️ Backend System Architecture 
 
-ProjectZ is engineered as an eSports-grade simulation, demanding zero compromise on competitive integrity.
+Utilizing enterprise configurations for scaling matchmakers rapidly globally.
 
-### Backend & Matchmaking (Nakama + CockroachDB)
-* Leverages Hashicorp's **Nakama** backend.
-* **Authentication:** Device ID, Email, or Anonymous headless logins.
-* **Matchmaker:** Ticket-based matchmaking matching players based on hidden MMR/ELO tracked in the database.
+### Infrastructure Networking (Nakama + CockroachDB)
+* Hashicorp's **Nakama Backend** serves as our central nervous system orchestrating deep queues and sessions.
+* Employs internal database arrays via **CockroachDB**, tracking internal Player Profiling metrics heavily tied to scaling mathematical ELO configurations across specific matchmaking iterations natively.
 
 ```mermaid
 graph TD
@@ -209,25 +221,26 @@ graph TD
     classDef backend fill:#d35400,stroke:#e67e22,stroke-width:2px,color:#fff;
     classDef server fill:#0984e3,stroke:#74b9ff,stroke-width:2px,color:#fff;
     
-    C1[Game Client 1]:::client
-    C2[Game Client 2]:::client
-    N[Nakama Backend]:::backend
-    DB[(CockroachDB)]:::backend
-    FS[FishNet Headless Server]:::server
+    C1[End-User Local Client Node]:::client
+    C2[Enemy Combatant Client Node]:::client
+    N[Nakama Web-Sockets Orchestrator]:::backend
+    DB[(CockroachDB Persistence Layer)]:::backend
+    FS[FishNet Headless Process Instance]:::server
     
-    C1 -->|Auth & Matchmaking| N
-    C2 -->|Auth & Matchmaking| N
-    N <-->|Persist ELO & Profiles| DB
-    N -->|Ticket Match| FS
-    C1 <-->|UDP State Sync| FS
-    C2 <-->|UDP State Sync| FS
+    C1 -->|Authenticate JWT Tokens| N
+    C2 -->|Assign Matchmaking Tickets| N
+    N <-->|Commit Profile Variations & ELO Metrics| DB
+    N -->|Relay Assigned Game Port Topology| FS
+    C1 <-->|Bi-Directional Heavy UDP State Synchronization| FS
+    C2 <-->|Bi-Directional Heavy UDP State Synchronization| FS
 ```
 
-### The VFX & Polish Pipeline (Zero Art Assets)
-A sophisticated procedural feedback loop managed by `CombatVFXBridge`:
-1. **Procedural Muzzle Flashes & Trails:** Dynamic point lights and Havoc-pooled `LineRenderer` components traced over 80ms.
-2. **Surface-Aware Impacts:** Sparks (Metal), Debris (Stone) instantiated exactly at the normal vector of the bullet hit.
-3. **Dynamic FOV & Screen FX:** Sprinting Lerps the camera FOV, and taking damage triggers deep red vignettes and UI blood splatters.
+### The Procedural VFX Sub-Systems (Zero-Art Logic Flow)
+An incredibly intense 10-tier feedback integration sequence driven entirely via algorithmic code rather than heavy visual assets guaranteeing memory optimization boundaries.
+1. `CombatVFXBridge` leverages event bus protocols natively picking up `OnFire` and `OnDamage` boolean triggers instantly avoiding inspector references.
+2. Spawns PointLights tracking fire-rate algorithms directly natively dynamically.
+3. Distributes highly optimized `LineRenderer` vectors functioning as Bullet Tracer architectures pooled internally via native caching methodologies fading globally mathematically across precisely 80ms windows smoothly.
+4. Executes complex UI Canvas behaviors initiating dense Red Vignettes spanning border parameters alongside directional blood splatter configurations depending intimately upon vector damage incoming data structures.
 
 ```mermaid
 graph LR
@@ -235,26 +248,25 @@ graph LR
     classDef bus fill:#f39c12,color:#fff;
     classDef system fill:#27ae60,color:#fff;
 
-    W[BaseWeapon]:::trigger -->|OnFire| E((GameEvents Bus)):::bus
-    H[PlayerHealth]:::trigger -->|OnDamage| E
+    W[Base Weapon Inheritance Structs]:::trigger -->|Trigger OnFire Vectors| E((Static Event Notification Bus System)):::bus
+    H[Player Health System Component]:::trigger -->|Trigger OnDamage Variables| E
     
-    E --> V[CombatVFXBridge]:::system
+    E --> V[Combat Visual Effects Integration Pipeline]:::system
     
-    V -->|Instantiate| M(Muzzle Flash & Light)
-    V -->|Pool| T(Bullet Trails)
-    V -->|Math| C(Perlin Camera Shake)
-    V -->|UI| U(Red Vignette & Splatter)
+    V -->|Instantiate Dynamics| M(Procedural Point Lights)
+    V -->|Access Memory Cache Pools| T(Object-Pooled Raycast Rendered Beams)
+    V -->|Execute Mathematical Rotations| C(Perlin-Noise Actively Mutating Camera Matrix)
+    V -->|Broadcast UI Changes| U(Red Scaled Warning Vectors & Damage Displays)
 ```
 
 ---
 
-## 🚀 Deployment & CI/CD
+## 🚀 DevOps Lifecycle & Global Deployments
 
-Ready for edge orchestration software (e.g., AWS GameLift, Edgegap).
+Repository systems natively output Docker Image configurations built explicitly on minimal footprint Alpine architectures targeting orchestrated global containerization systems natively.
 
-*   **Headless Linux Build:** Contains a dedicated `Dockerfile.server` targeting lightweight Alpine Linux instances.
-*   **Docker-Compose:** One-click local deployment for Nakama, CockroachDB, and Game Server linking.
-*   **GitHub Actions:** Automated pipeline to compile Unity Server builds, push to DockerHub, and trigger rolling fleet updates upon `master` branch merges.
+*   `Dockerfile.server` structures lightweight standalone environments internally executing binaries flawlessly natively.
+*   Automated workflow topologies natively build and sequentially deploy containerized arrays spanning `docker-compose` capabilities targeting AWS GameLift structures via internal Edge Orchestration integrations minimizing runtime variations globally entirely natively locally directly automatically smoothly globally.
 
 ---
-*Created as a masterclass in modern Unity Multiplayer Networking and Systems Design.*
+*Created as an ultimate masterclass in modern Unity Protocol Paradigms, Systems Architecture integrations, and Networking execution capabilities flawlessly natively globally.*
