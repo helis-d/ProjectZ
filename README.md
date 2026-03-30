@@ -77,18 +77,18 @@ graph TD
     classDef Fail fill:#c0392b,stroke:#e74c3c,stroke-width:2px,color:#fff;
     classDef Level fill:#8e44ad,stroke:#9b59b6,stroke-width:2px,color:#fff;
 
-    A[Player Engages in Duel]:::Event
-    A -->|Secures Headshot| B(+100 XP):::Success
-    A -->|Dies to Headshot| C(-40 XP):::Fail
+    A["Player Engages in Duel"]:::Event
+    A -->|Secures Headshot| B["+100 XP"]:::Success
+    A -->|Dies to Headshot| C["-40 XP"]:::Fail
     
-    B --> D{Hits 2000 XP Threshold?}:::Event
-    C --> E{Drops Below 2000 XP?}:::Event
+    B --> D{"Hits 2000 XP Threshold?"}:::Event
+    C --> E{"Drops Below 2000 XP?"}:::Event
     
-    D -->|Yes| F((Levels Up to Level III)):::Level
-    E -->|Yes| G((De-levels to Level II)):::Fail
+    D -->|Yes| F(["Levels Up to Level III"]):::Level
+    E -->|Yes| G(["De-levels to Level II"]):::Fail
     
-    F -->|Apply Buffs| H[15% Faster Reload Speed applied live!]:::Success
-    G -->|Strip Buffs| I[Return to Standard Reload Speed]:::Event
+    F -->|Apply Buffs| H["15% Faster Reload Speed applied live!"]:::Success
+    G -->|Strip Buffs| I["Return to Standard Reload Speed"]:::Event
 ```
 
 *Note: Dropping a weapon completely wipes its Mastery XP. A newly picked-up weapon by any player will automatically reset to Level I.*
