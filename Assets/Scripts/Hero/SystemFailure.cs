@@ -37,7 +37,7 @@ namespace ProjectZ.Hero.Volt
             }
 
             // Cleanup or play local sfx...
-            Despawn(gameObject); // Self-destruct after casting or keep alive for duration if needed
+            Debug.Log("[SystemFailure] Enemy HUD blackout pulse sent.");
         }
 
         [TargetRpc]

@@ -30,8 +30,8 @@ namespace ProjectZ.Hero.Samuel
         {
             if (!IsServerInitialized) return;
 
-            _ownerHealth = GetComponent<PlayerHealth>();
-            _combatController = GetComponent<PlayerCombatController>();
+            _ownerHealth = GetOwnerComponent<PlayerHealth>();
+            _combatController = GetOwnerComponent<PlayerCombatController>();
             if (_combatController != null)
                 _combatController.OnServerFired += HandleWeaponFired;
 

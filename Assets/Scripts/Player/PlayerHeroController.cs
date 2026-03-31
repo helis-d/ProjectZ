@@ -1,7 +1,18 @@
-using System.Collections.Generic;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using ProjectZ.Core;
+using ProjectZ.Hero.Helix;
+using ProjectZ.Hero.Jacob;
+using ProjectZ.Hero.Jielda;
+using ProjectZ.Hero.Kant;
+using ProjectZ.Hero.Lagrange;
+using ProjectZ.Hero.Marcus;
+using ProjectZ.Hero.Sai;
+using ProjectZ.Hero.Samuel;
+using ProjectZ.Hero.Sector;
+using ProjectZ.Hero.Silvia;
+using ProjectZ.Hero.Volt;
+using ProjectZ.Hero.Zauhll;
 using ProjectZ.Hero;
 using ProjectZ.Weapon;
 using UnityEngine;
@@ -22,8 +33,8 @@ namespace ProjectZ.Player
 
         private UltimateAbility _activeUltimate;
         private PlayerInputHandler _input;
-        private GameObject _originalUltimatePrefab;
         private bool _hasStolenUltimate;
+        private UltimateAbilityId _baseUltimateId;
 
         public HeroData Hero => _selectedHero;
         public bool IsUltimateReady => UltimateCharge.Value >= 100f;
@@ -75,22 +86,20 @@ namespace ProjectZ.Player
 
             _selectedHero = hero;
             UltimateCharge.Value = 0f;
-            _originalUltimatePrefab = hero.ultimateAbilityPrefab;
+            _baseUltimateId = hero.ultimateId;
             _hasStolenUltimate = false;
 
-            EquipUltimatePrefab(_originalUltimatePrefab);
-
-            if (_originalUltimatePrefab == null && hero.ultimateId != UltimateAbilityId.None)
-            {
-                Debug.LogWarning($"[PlayerHeroController] {hero.heroName} has canonical ultimate data ({hero.ultimateId}) but no authored prefab is bound yet.");
-            }
+            EquipUltimate(hero.ultimateId);
         }
 
         [Server]
-        public void EquipStolenUltimate(GameObject stolenPrefab)
+        public void EquipStolenUltimate(UltimateAbilityId stolenUltimateId)
         {
+            if (stolenUltimateId == UltimateAbilityId.None)
+                return;
+
             _hasStolenUltimate = true;
-            EquipUltimatePrefab(stolenPrefab);
+            EquipUltimate(stolenUltimateId);
         }
 
         [Server]
@@ -100,24 +109,19 @@ namespace ProjectZ.Player
         }
 
         [Server]
-        private void EquipUltimatePrefab(GameObject prefab)
+        private void EquipUltimate(UltimateAbilityId ultimateId)
         {
-            if (_activeUltimate != null)
+            _activeUltimate = ResolveAttachedUltimate(ultimateId);
+            if (_activeUltimate == null)
             {
-                if (_activeUltimate.IsSpawned)
-                    Despawn(_activeUltimate.gameObject);
-                Destroy(_activeUltimate.gameObject);
+                if (ultimateId != UltimateAbilityId.None)
+                {
+                    Debug.LogWarning($"[PlayerHeroController] No runtime ultimate component is attached for {ultimateId} on {gameObject.name}.");
+                }
+                return;
             }
 
-            if (prefab == null)
-                return;
-
-            GameObject obj = Instantiate(prefab, transform);
-            ServerManager.Spawn(obj, Owner);
-
-            _activeUltimate = obj.GetComponent<UltimateAbility>();
-            if (_activeUltimate != null)
-                _activeUltimate.Initialize(this);
+            _activeUltimate.Initialize(this);
         }
 
         [Server]
@@ -145,9 +149,9 @@ namespace ProjectZ.Player
         {
             if (_activeUltimate == null)
             {
-                if (_selectedHero != null && _selectedHero.HasConfiguredUltimate)
+                if (_selectedHero != null && _selectedHero.ultimateId != UltimateAbilityId.None)
                 {
-                    Debug.LogWarning($"[PlayerHeroController] {_selectedHero.heroName} has canonical ultimate data but no authored runtime prefab. Activation is blocked until prefab authoring is complete.");
+                    Debug.LogWarning($"[PlayerHeroController] {_selectedHero.heroName} has canonical ultimate data but no matching runtime component is attached to the player prefab.");
                 }
                 return false;
             }
@@ -167,7 +171,7 @@ namespace ProjectZ.Player
             if (_hasStolenUltimate)
             {
                 _hasStolenUltimate = false;
-                EquipUltimatePrefab(_originalUltimatePrefab);
+                EquipUltimate(_baseUltimateId);
             }
 
             WeaponMasteryManager mastery = GetComponent<WeaponMasteryManager>();
@@ -183,6 +187,27 @@ namespace ProjectZ.Player
             }
 
             return true;
+        }
+
+        private UltimateAbility ResolveAttachedUltimate(UltimateAbilityId ultimateId)
+        {
+            return ultimateId switch
+            {
+                UltimateAbilityId.SiegeBreaker => GetComponent<SiegeBreaker>(),
+                UltimateAbilityId.QuantumRewind => GetComponent<TemporalRewind>(),
+                UltimateAbilityId.Panopticon => GetComponent<PanopticonTotem>(),
+                UltimateAbilityId.DoomsdayCharge => GetComponent<DoomsdayCharge>(),
+                UltimateAbilityId.OverdriveCore => GetComponent<OverdriveCore>(),
+                UltimateAbilityId.BloodPact => GetComponent<BloodPact>(),
+                UltimateAbilityId.SpiritWolves => GetComponent<SpiritWolves>(),
+                UltimateAbilityId.VoidWalk => GetComponent<VoidWalk>(),
+                UltimateAbilityId.SystemFailure => GetComponent<SystemFailure>(),
+                UltimateAbilityId.BladeDance => GetComponent<BladeDance>(),
+                UltimateAbilityId.OneWayMirror => GetComponent<OneWayMirror>(),
+                UltimateAbilityId.Echo => GetComponent<IdentityTheft>(),
+                UltimateAbilityId.GrappleStrike => GetComponent<GrappleStrike>(),
+                _ => null
+            };
         }
 
         private void HandlePlayerDeath(int victimId, int killerId)

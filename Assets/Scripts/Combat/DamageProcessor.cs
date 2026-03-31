@@ -1,5 +1,6 @@
 using FishNet.Object;
 using ProjectZ.Core;
+using ProjectZ.Hero.Samuel;
 using ProjectZ.Player;
 using ProjectZ.Weapon;
 using UnityEngine;
@@ -43,7 +44,8 @@ namespace ProjectZ.Combat
             float baseDamage = weaponData.baseDamage;
             float zoneMultiplier = hitscanResult.HitboxResult.DamageMultiplier;
             float wallbangMult = hitscanResult.DamageMultiplier;
-            float finalDamage = baseDamage * zoneMultiplier * wallbangMult;
+            float bloodPactMult = GetBloodPactMultiplier(shooterConnId);
+            float finalDamage = baseDamage * zoneMultiplier * wallbangMult * bloodPactMult;
 
             HitboxZone zone = hitscanResult.HitboxResult.Zone;
             bool isHeadshot = zone == HitboxZone.Head || zone == HitboxZone.Neck;
@@ -114,6 +116,15 @@ namespace ProjectZ.Combat
                 return null;
 
             return conn.FirstObject.GetComponent<WeaponMasteryManager>();
+        }
+
+        private float GetBloodPactMultiplier(int connId)
+        {
+            if (!ServerManager.Clients.TryGetValue(connId, out var conn) || conn.FirstObject == null)
+                return 1f;
+
+            BloodPact bloodPact = conn.FirstObject.GetComponent<BloodPact>();
+            return bloodPact != null ? bloodPact.GetDamageMultiplier() : 1f;
         }
     }
 }

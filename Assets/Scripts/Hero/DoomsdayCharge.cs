@@ -28,8 +28,8 @@ namespace ProjectZ.Hero.Sector
             if (!IsServerInitialized) return;
 
             // Spawn projectile in front of player
-            Vector3 spawnPos = transform.position + transform.forward * 1.5f + Vector3.up * 0.5f;
-            Vector3 throwDir = transform.forward;
+            Vector3 spawnPos = CasterTransform.position + CasterTransform.forward * 1.5f + Vector3.up * 0.5f;
+            Vector3 throwDir = CasterTransform.forward;
 
             if (_chargePrefab != null)
             {
@@ -72,7 +72,7 @@ namespace ProjectZ.Hero.Sector
         [Server]
         private void ApplyExplosionDamage(Vector3 center)
         {
-            Collider[] hits = Physics.OverlapSphere(center, _outerRadius, _playerLayer);
+            Collider[] hits = Physics.OverlapSphere(center, _outerRadius, ResolveLayerMask(_playerLayer));
             TeamManager tm = TeamManager.Instance;
 
             foreach (Collider hit in hits)
@@ -94,7 +94,7 @@ namespace ProjectZ.Hero.Sector
                 if (cc != null && cc.height < 1.5f) // crouching
                     damage *= 0.5f;
 
-                health.TakeDamage(damage, OwnerId);
+                health.TakeDamage(damage, OwnerConnectionId);
                 Debug.Log($"[DoomsdayCharge] {health.OwnerId} took {damage:F0} dmg (dist: {dist:F1}m)");
             }
 

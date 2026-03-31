@@ -35,8 +35,8 @@ namespace ProjectZ.Hero.Silvia
         {
             if (!IsServerInitialized) return;
 
-            _tunnelStart = transform.position;
-            _tunnelEnd = transform.position + transform.forward * _tunnelLength;
+            _tunnelStart = CasterTransform.position;
+            _tunnelEnd = CasterTransform.position + CasterTransform.forward * _tunnelLength;
             _tunnelCenter = (_tunnelStart + _tunnelEnd) * 0.5f;
             _remainingTime = _baseDuration;
             _isActive = true;

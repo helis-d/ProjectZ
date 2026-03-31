@@ -48,12 +48,12 @@ namespace ProjectZ.Hero.Zauhll
 
         private void HandleFirstKill(int victimId, int killerId)
         {
-            if (!_isActive || _firstHitUsed || killerId != OwnerId) return;
+            if (!_isActive || _firstHitUsed || killerId != OwnerConnectionId) return;
 
             _firstHitUsed = true;
 
             // 100% lifesteal — restore HP equal to damage dealt
-            PlayerHealth health = GetComponent<PlayerHealth>();
+            PlayerHealth health = GetOwnerComponent<PlayerHealth>();
             if (health != null)
             {
                 health.AddHealth(50f); // Approximate lifesteal

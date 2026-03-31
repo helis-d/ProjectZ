@@ -42,8 +42,7 @@ namespace ProjectZ.Hero.Lagrange
             // Optional: TargetRpc to owner to play a flashy screen effect
             TargetPlayRewindVFX(OwnerController.Owner);
 
-            // Cleanup
-            Despawn(gameObject);
+            Debug.Log("[TemporalRewind] Rewind complete.");
         }
 
         [TargetRpc]

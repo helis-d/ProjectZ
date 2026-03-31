@@ -24,7 +24,7 @@ namespace ProjectZ.Player
         private bool       _hasDefuseKit = false; // Stub for economy/equipment
 
         // Local progress (0.0 to 1.0) for UI
-        public float Progress => _interactionTimer / GetRequiredTime();
+        public float Progress => Mathf.Clamp01(_interactionTimer / Mathf.Max(0.01f, GetRequiredTime()));
 
         private void Awake()
         {
@@ -59,6 +59,12 @@ namespace ProjectZ.Player
                 }
                 else
                 {
+                    if (!CanContinueInteraction(myTeam))
+                    {
+                        CancelInteraction(myTeam);
+                        return;
+                    }
+
                     _interactionTimer += Time.deltaTime;
                     if (_interactionTimer >= GetRequiredTime())
                     {
@@ -87,14 +93,14 @@ namespace ProjectZ.Player
 
         private void TryStartInteraction(Team myTeam)
         {
-            if (myTeam == Team.Attacker && _currentSite != null)
+            if (myTeam == Team.Attacker && _currentSite != null && CanContinueInteraction(myTeam))
             {
                 // Attackers can plant if in a site and Idle
                 CmdStartPlant(_currentSite.SiteID);
                 _isInteracting = true;
                 _interactionTimer = 0f;
             }
-            else if (myTeam == Team.Defender && _sphereManager.CurrentState.Value == Sphere.SphereState.Active)
+            else if (myTeam == Team.Defender && CanContinueInteraction(myTeam))
             {
                 // Defenders can defuse if Active
                 CmdStartDefuse();
@@ -134,6 +140,30 @@ namespace ProjectZ.Player
                 return _sphereManager.GetDefuseTime(_hasDefuseKit);
 
             return 999f;
+        }
+
+        private bool CanContinueInteraction(Team myTeam)
+        {
+            if (_sphereManager == null)
+                return false;
+
+            if (myTeam == Team.Attacker)
+            {
+                RoundManager roundManager = RoundManager.Instance;
+                return _currentSite != null
+                    && _sphereManager.CurrentState.Value == SphereState.Idle
+                    && (roundManager == null || roundManager.CurrentState.Value == RoundManager.RoundState.ActionPhase);
+            }
+
+            if (myTeam == Team.Defender)
+            {
+                if (_sphereManager.CurrentState.Value != SphereState.Active && _sphereManager.CurrentState.Value != SphereState.Defusing)
+                    return false;
+
+                return Vector3.Distance(transform.position, _sphereManager.transform.position) <= 3.25f;
+            }
+
+            return false;
         }
 
         // ─── Server RPCs ──────────────────────────────────────────────────

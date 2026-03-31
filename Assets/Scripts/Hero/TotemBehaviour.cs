@@ -59,8 +59,11 @@ namespace ProjectZ.Hero.Sector
         private void ScanPulse()
         {
             if (TeamManager.Instance == null) return;
+            if (!ServerManager.Clients.TryGetValue(_ownerId, out var ownerConn))
+                return;
 
-            Collider[] hits = Physics.OverlapSphere(transform.position, _scanRadius, _playerLayer);
+            int playerMask = _playerLayer.value == 0 ? Physics.AllLayers : _playerLayer.value;
+            Collider[] hits = Physics.OverlapSphere(transform.position, _scanRadius, playerMask);
             foreach (Collider hit in hits)
             {
                 // Find root network object
@@ -77,7 +80,7 @@ namespace ProjectZ.Hero.Sector
                         {
                             // Target is enemy inside the radius: Send RPC to make them glow!
                             // The duration of the glow should be roughly the pulse interval (e.g. 1 sec)
-                            outline.TargetShowOutline(netObj.Owner, _scanInterval);
+                            outline.TargetShowOutline(ownerConn, _scanInterval);
                         }
                     }
                 }

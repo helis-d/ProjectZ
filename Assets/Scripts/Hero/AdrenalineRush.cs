@@ -36,7 +36,7 @@ namespace ProjectZ.Hero.Kant
                 if (targetTeam == myTeam || targetTeam == ProjectZ.Core.Team.None) // None check for Solo modes
                 {
                     // Check Distance
-                    float distance = Vector3.Distance(OwnerController.transform.position, client.FirstObject.transform.position);
+                    float distance = Vector3.Distance(CasterTransform.position, client.FirstObject.transform.position);
                     if (distance <= _buffRadius)
                     {
                         // Target is an ally within radius (or self)
@@ -50,8 +50,7 @@ namespace ProjectZ.Hero.Kant
                 }
             }
 
-            // Cleanup the cast object over network
-            Despawn(gameObject);
+            Debug.Log("[AdrenalineRush] Buff pulse complete.");
         }
 
         [TargetRpc]

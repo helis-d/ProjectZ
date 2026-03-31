@@ -60,17 +60,17 @@ namespace ProjectZ.Hero.Sai
         private void ExecuteStrike12()
         {
             // Cone/sphere damage in front of player
-            Collider[] hits = Physics.OverlapSphere(transform.position, _strike12Range, _playerLayer);
+            Collider[] hits = Physics.OverlapSphere(CasterTransform.position, _strike12Range, ResolveLayerMask(_playerLayer));
             foreach (Collider hit in hits)
             {
                 // Only hit enemies in front hemisphere
-                Vector3 toTarget = (hit.transform.position - transform.position).normalized;
-                if (Vector3.Dot(transform.forward, toTarget) < 0.3f) continue;
+                Vector3 toTarget = (hit.transform.position - CasterTransform.position).normalized;
+                if (Vector3.Dot(CasterTransform.forward, toTarget) < 0.3f) continue;
 
                 PlayerHealth health = hit.GetComponentInParent<PlayerHealth>();
-                if (health != null && !health.IsDead.Value && health.OwnerId != OwnerId)
+                if (health != null && !health.IsDead.Value && health.OwnerId != OwnerConnectionId)
                 {
-                    health.TakeDamage(_strike12Damage, OwnerId);
+                    health.TakeDamage(_strike12Damage, OwnerConnectionId);
                     Debug.Log($"[BladeDance] Strike {_currentStrike} hit player {health.OwnerId} for {_strike12Damage}");
                 }
             }
@@ -80,26 +80,26 @@ namespace ProjectZ.Hero.Sai
         private void ExecuteStrike3()
         {
             // Extended range + root
-            Collider[] hits = Physics.OverlapSphere(transform.position, _strike3Range, _playerLayer);
+            Collider[] hits = Physics.OverlapSphere(CasterTransform.position, _strike3Range, ResolveLayerMask(_playerLayer));
             foreach (Collider hit in hits)
             {
-                Vector3 toTarget = (hit.transform.position - transform.position).normalized;
-                if (Vector3.Dot(transform.forward, toTarget) < 0.2f) continue;
+                Vector3 toTarget = (hit.transform.position - CasterTransform.position).normalized;
+                if (Vector3.Dot(CasterTransform.forward, toTarget) < 0.2f) continue;
 
                 PlayerHealth health = hit.GetComponentInParent<PlayerHealth>();
-                if (health != null && !health.IsDead.Value && health.OwnerId != OwnerId)
+                if (health != null && !health.IsDead.Value && health.OwnerId != OwnerConnectionId)
                 {
                     // Root: disable movement for duration
                     var nob = hit.GetComponentInParent<FishNet.Object.NetworkObject>();
                     if (nob != null && nob.Owner.IsValid)
                     {
-                        RpcApplyRoot(nob.Owner, _rootDuration);
+                        RpcApplyRoot(nob.Owner, nob.gameObject, _rootDuration);
                     }
 
                     // Reveal position via outline
                     var outline = hit.GetComponentInParent<OutlineController>();
-                    if (outline != null)
-                        outline.TargetShowOutline(nob.Owner, _rootDuration);
+                    if (outline != null && OwnerController != null)
+                        outline.TargetShowOutline(OwnerController.Owner, _rootDuration);
 
                     Debug.Log($"[BladeDance] Strike 3 rooted player {health.OwnerId} for {_rootDuration}s");
                 }
@@ -110,19 +110,23 @@ namespace ProjectZ.Hero.Sai
         public bool IsBlockingBullets => _isActive && _currentStrike >= 1 && _currentStrike <= 2;
 
         [TargetRpc]
-        private void RpcApplyRoot(FishNet.Connection.NetworkConnection conn, float duration)
+        private void RpcApplyRoot(FishNet.Connection.NetworkConnection conn, GameObject targetPlayer, float duration)
         {
-            StartCoroutine(RootRoutine(duration));
+            if (targetPlayer != null)
+                StartCoroutine(RootRoutine(targetPlayer, duration));
         }
 
-        private IEnumerator RootRoutine(float duration)
+        private IEnumerator RootRoutine(GameObject targetPlayer, float duration)
         {
-            var movement = GetComponent<PlayerMovement>();
+            PlayerMovement movement = targetPlayer.GetComponent<PlayerMovement>();
+            PlayerInputHandler input = targetPlayer.GetComponent<PlayerInputHandler>();
             if (movement != null) movement.enabled = false;
+            if (input != null) input.enabled = false;
 
             yield return new WaitForSeconds(duration);
 
             if (movement != null) movement.enabled = true;
+            if (input != null) input.enabled = true;
         }
 
         [ObserversRpc]

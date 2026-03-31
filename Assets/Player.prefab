@@ -23,6 +23,25 @@ GameObject:
   - component: {fileID: 3571956606545138755}
   - component: {fileID: 267365230368395643}
   - component: {fileID: 7098798881657700756}
+  - component: {fileID: 600100000000000001}
+  - component: {fileID: 600100000000000002}
+  - component: {fileID: 600100000000000003}
+  - component: {fileID: 600100000000000004}
+  - component: {fileID: 600100000000000005}
+  - component: {fileID: 600100000000000006}
+  - component: {fileID: 600100000000000007}
+  - component: {fileID: 600100000000000008}
+  - component: {fileID: 600100000000000009}
+  - component: {fileID: 600100000000000010}
+  - component: {fileID: 600100000000000011}
+  - component: {fileID: 600100000000000012}
+  - component: {fileID: 600100000000000013}
+  - component: {fileID: 600100000000000014}
+  - component: {fileID: 600100000000000015}
+  - component: {fileID: 600100000000000016}
+  - component: {fileID: 600100000000000017}
+  - component: {fileID: 600100000000000018}
+  - component: {fileID: 600100000000000019}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -56,7 +75,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 26b716c41e9b56b4baafaf13a523ba2e, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: FishNet.Runtime::FishNet.Object.NetworkObject
   <IsNested>k__BackingField: 0
   WasActiveDuringEdit: 0
@@ -70,6 +89,25 @@ MonoBehaviour:
   - {fileID: 2126825333063504382}
   - {fileID: 3947205945294323555}
   - {fileID: 3159844141268275347}
+  - {fileID: 600100000000000001}
+  - {fileID: 600100000000000002}
+  - {fileID: 600100000000000003}
+  - {fileID: 600100000000000004}
+  - {fileID: 600100000000000005}
+  - {fileID: 600100000000000006}
+  - {fileID: 600100000000000007}
+  - {fileID: 600100000000000008}
+  - {fileID: 600100000000000009}
+  - {fileID: 600100000000000010}
+  - {fileID: 600100000000000011}
+  - {fileID: 600100000000000012}
+  - {fileID: 600100000000000013}
+  - {fileID: 600100000000000014}
+  - {fileID: 600100000000000015}
+  - {fileID: 600100000000000016}
+  - {fileID: 600100000000000017}
+  - {fileID: 600100000000000018}
+  - {fileID: 600100000000000019}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -140,7 +178,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d333c5118c1edf34081516d24cee8b7c, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Player.PlayerMovement
   _componentIndexCache: 255
   _addedNetworkObject: {fileID: 712034578787711353}
@@ -163,7 +201,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c1da8ef874aac3543965e87539eb7143, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Player.PlayerHealth
   _componentIndexCache: 0
   _addedNetworkObject: {fileID: 712034578787711353}
@@ -180,7 +218,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d0f1accab1529c0498e022155aa0869a, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Player.PlayerHeroController
   _componentIndexCache: 1
   _addedNetworkObject: {fileID: 712034578787711353}
@@ -196,7 +234,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 62899f850307741f2a39c98a8b639597, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.PlayerInput
   m_Actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_NotificationBehavior: 0
@@ -226,7 +264,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: be4140805634d4e4095edd5dd2031a80, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Player.PlayerInputHandler
 --- !u!114 &2126825333063504382
 MonoBehaviour:
@@ -238,7 +276,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 03bbeb5451302044ca4234ee32f0b78d, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Player.PlayerInventory
   _componentIndexCache: 2
   _addedNetworkObject: {fileID: 712034578787711353}
@@ -257,7 +295,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b59f0431576af5047bb635cbb334d066, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Combat.HitscanShooter
   _maxRange: 200
   _maxWallPenetrations: 3
@@ -279,7 +317,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0b6f90b29684732488b255ead2e80a7b, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Combat.DamageProcessor
   _componentIndexCache: 3
   _addedNetworkObject: {fileID: 712034578787711353}
@@ -294,7 +332,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f7a9631d8c870074bb5b510acce79f75, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Player.PlayerCombatController
   _componentIndexCache: 4
   _addedNetworkObject: {fileID: 712034578787711353}
@@ -309,7 +347,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4d2ca0f0bfcece943bed3b4d9e201e8b, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Player.PlayerCamera
   _componentIndexCache: 255
   _addedNetworkObject: {fileID: 712034578787711353}
@@ -330,7 +368,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: df1252d80e61a5649a65d69c1499ef6a, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Player.PlayerAnimator
   _componentIndexCache: 255
   _addedNetworkObject: {fileID: 712034578787711353}
@@ -346,7 +384,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0690d06660272ac4290f18d421696ee6, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Player.FPSWeaponHolder
   _componentIndexCache: 255
   _addedNetworkObject: {fileID: 712034578787711353}
@@ -367,6 +405,296 @@ MonoBehaviour:
   _reloadDropAmount: 0.3
   _reloadTiltAngle: 30
   _reloadSpeed: 4
+--- !u!114 &600100000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 801981b9dac387e4b817175280de5ef9, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Economy.PlayerEconomy
+  _componentIndexCache: 5
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b96dc92d798d4d468b65a312253629a, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Player.SphereInteraction
+  _componentIndexCache: 6
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 443c3d3c6d67b4545a27d662f276df46, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Player.TemporalTracker
+  _componentIndexCache: 7
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+  _recordInterval: 0.5
+  _maxHistorySeconds: 10
+--- !u!114 &600100000000000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ea74eb1c0320ab54eb1963232a56c0ff, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Player.OutlineController
+  _componentIndexCache: 8
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+  _renderers: []
+  _outlineMaterial: {fileID: 0}
+--- !u!114 &600100000000000005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 498f5068ccf620c41b49c18a832fe355, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Weapon.WeaponMasteryManager
+  _componentIndexCache: 9
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+  _buffConfigs: []
+--- !u!114 &600100000000000006
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d3fb9546f2f02944da5f7fb731f12847, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Player.PlayerStats
+  _componentIndexCache: 10
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a497f3408e69474c9a43a0fab88f73e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.Jacob.SiegeBreaker
+  _componentIndexCache: 11
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000008
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0cd248cb8ef2754aab29e717b33c2d7, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.Lagrange.TemporalRewind
+  _componentIndexCache: 12
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000009
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3082243395e59ec469356baf67b7e3fe, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.Sector.PanopticonTotem
+  _componentIndexCache: 13
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000010
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b35380361a2f4c43a4b2f19f341b06c, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.Sector.DoomsdayCharge
+  _componentIndexCache: 14
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000011
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 175f77998706ddb4d8648e850732f130, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.Silvia.OverdriveCore
+  _componentIndexCache: 15
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000012
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4118a5f4807d01349bbeddd4031b7275, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.Samuel.BloodPact
+  _componentIndexCache: 16
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000013
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 91a302c3e540a0d4cbc60535adfcfdf5, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.Jielda.SpiritWolves
+  _componentIndexCache: 17
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000014
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dcc0d46e8e6669d41a0afd78b9e3bbbe, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.Zauhll.VoidWalk
+  _componentIndexCache: 18
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000015
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87fba1bd927e3c545a506629b79a21de, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.Volt.SystemFailure
+  _componentIndexCache: 19
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000016
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9d0baba51fbba984795b43e9e3b6b303, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.Sai.BladeDance
+  _componentIndexCache: 20
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000017
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8df5be699f34ddd43a74669a753824ec, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.Helix.OneWayMirror
+  _componentIndexCache: 21
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000018
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a6dca16f036af504abb4ea44549f8e1a, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.Kant.IdentityTheft
+  _componentIndexCache: 22
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000019
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dfc3a74bcc1059142adb92dec77ac289, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.Marcus.GrappleStrike
+  _componentIndexCache: 23
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
 --- !u!1001 &7388892586907033352
 PrefabInstance:
   m_ObjectHideFlags: 0

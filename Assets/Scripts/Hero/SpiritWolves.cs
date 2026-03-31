@@ -30,7 +30,7 @@ namespace ProjectZ.Hero.Jielda
             TeamManager tm = TeamManager.Instance;
             if (tm == null) return;
 
-            Team ownerTeam = tm.GetTeam(OwnerId);
+            Team ownerTeam = tm.GetTeam(OwnerConnectionId);
             List<int> targets = new List<int>();
 
             // Find enemies that have been damaged (using DamageAssistRegistry concept)
@@ -77,18 +77,18 @@ namespace ProjectZ.Hero.Jielda
             GameObject wolf = null;
             if (_wolfPrefab != null)
             {
-                wolf = Instantiate(_wolfPrefab, transform.position, Quaternion.identity);
+                wolf = Instantiate(_wolfPrefab, CasterTransform.position, Quaternion.identity);
                 ServerManager.Spawn(wolf);
             }
 
             // Simulate wolf travel time
-            float dist = Vector3.Distance(transform.position, conn.FirstObject.transform.position);
+            float dist = Vector3.Distance(CasterTransform.position, conn.FirstObject.transform.position);
             float travelTime = dist / _wolfTravelSpeed;
 
             if (wolf != null)
             {
                 float elapsed = 0f;
-                Vector3 start = transform.position;
+                Vector3 start = CasterTransform.position;
                 while (elapsed < travelTime)
                 {
                     if (conn.FirstObject != null)
@@ -106,16 +106,18 @@ namespace ProjectZ.Hero.Jielda
             // Apply stun
             if (conn.FirstObject != null)
             {
-                RpcApplyStun(conn, _stunDuration);
+                RpcApplyStun(conn, conn.FirstObject.gameObject, _stunDuration);
                 Debug.Log($"[SpiritWolves] Player {targetId} stunned for {_stunDuration}s");
             }
         }
 
         [TargetRpc]
-        private void RpcApplyStun(FishNet.Connection.NetworkConnection conn, float duration)
+        private void RpcApplyStun(FishNet.Connection.NetworkConnection conn, GameObject targetPlayer, float duration)
         {
-            // Client-side: disable input for duration
-            var input = GetComponent<PlayerInputHandler>();
+            if (targetPlayer == null)
+                return;
+
+            PlayerInputHandler input = targetPlayer.GetComponent<PlayerInputHandler>();
             if (input != null)
                 StartCoroutine(StunRoutine(input, duration));
         }

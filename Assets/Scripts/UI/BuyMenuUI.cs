@@ -1,6 +1,7 @@
 using FishNet.Object;
 using ProjectZ.Economy;
 using ProjectZ.GameMode;
+using ProjectZ.Map;
 using ProjectZ.Player;
 using ProjectZ.Weapon;
 using UnityEngine;
@@ -34,6 +35,9 @@ namespace ProjectZ.UI
 
         private void Update()
         {
+            if (_buyMenuPanel != null && _buyMenuPanel.activeSelf && !CanUseBuyMenu())
+                CloseMenu();
+
             if (Input.GetKeyDown(KeyCode.B))
                 ToggleMenu();
         }
@@ -44,9 +48,9 @@ namespace ProjectZ.UI
                 return;
 
             bool isOpening = !_buyMenuPanel.activeSelf;
-            if (isOpening && _roundManager != null && _roundManager.CurrentState.Value != RoundManager.RoundState.BuyPhase)
+            if (isOpening && !CanUseBuyMenu())
             {
-                Debug.LogWarning("[BuyMenu] Can only open during Buy Phase.");
+                Debug.LogWarning("[BuyMenu] Buy menu requires Buy Phase and a friendly buy zone.");
                 return;
             }
 
@@ -69,7 +73,13 @@ namespace ProjectZ.UI
         [ServerRpc]
         private void CmdBuyWeapon(string weaponId, int requestedPrice)
         {
+            if (_roundManager == null)
+                _roundManager = RoundManager.Instance ?? FindFirstObjectByType<RoundManager>();
+
             if (_roundManager == null || _roundManager.CurrentState.Value != RoundManager.RoundState.BuyPhase)
+                return;
+
+            if (BuyZone.HasConfiguredZones() && !BuyZone.IsPlayerInsideFriendlyZone(gameObject, OwnerId))
                 return;
 
             PlayerEconomy economy = GetComponent<PlayerEconomy>();
@@ -100,6 +110,30 @@ namespace ProjectZ.UI
                 inventory.PickUpWeapon(purchasedWeapon);
                 Debug.Log($"[Server] Player {OwnerId} bought {purchasedWeapon.weaponName} for ${requestedPrice}");
             }
+        }
+
+        private bool CanUseBuyMenu()
+        {
+            if (_roundManager == null)
+                _roundManager = RoundManager.Instance ?? FindFirstObjectByType<RoundManager>();
+
+            if (_roundManager != null && _roundManager.CurrentState.Value != RoundManager.RoundState.BuyPhase)
+                return false;
+
+            if (!BuyZone.HasConfiguredZones())
+                return true;
+
+            return BuyZone.IsPlayerInsideFriendlyZone(gameObject, OwnerId);
+        }
+
+        private void CloseMenu()
+        {
+            if (_buyMenuPanel == null || !_buyMenuPanel.activeSelf)
+                return;
+
+            _buyMenuPanel.SetActive(false);
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         }
 
         private WeaponData FindWeaponById(string weaponId)

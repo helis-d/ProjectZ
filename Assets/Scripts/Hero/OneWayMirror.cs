@@ -30,8 +30,8 @@ namespace ProjectZ.Hero.Helix
         {
             if (!IsServerInitialized) return;
 
-            Vector3 pos = transform.position + transform.forward * _placeDistance;
-            Quaternion rot = Quaternion.LookRotation(transform.forward);
+            Vector3 pos = CasterTransform.position + CasterTransform.forward * _placeDistance;
+            Quaternion rot = Quaternion.LookRotation(CasterTransform.forward);
 
             if (_mirrorPrefab != null)
             {
@@ -54,7 +54,9 @@ namespace ProjectZ.Hero.Helix
             GameEvents.OnPlayerDeath += HandleKillBehindMirror;
             StartCoroutine(MirrorLifetime());
 
-            RpcSetupMirrorVisuals(_activeMirror, OwnerId);
+            FishNet.Object.NetworkObject mirrorNetworkObject = _activeMirror.GetComponent<FishNet.Object.NetworkObject>();
+            if (mirrorNetworkObject != null)
+                RpcSetupMirrorVisuals(_activeMirror, OwnerConnectionId);
             Debug.Log($"[OneWayMirror] Placed at {pos}, {_width}×{_height}m, {_duration}s");
         }
 
@@ -80,16 +82,16 @@ namespace ProjectZ.Hero.Helix
 
         private void HandleKillBehindMirror(int victimId, int killerId)
         {
-            if (!_isActive || killerId != OwnerId || _activeMirror == null) return;
+            if (!_isActive || killerId != OwnerConnectionId || _activeMirror == null) return;
 
             // Check if owner is behind the mirror
             Vector3 mirrorForward = _activeMirror.transform.forward;
-            Vector3 ownerToMirror = _activeMirror.transform.position - transform.position;
+            Vector3 ownerToMirror = _activeMirror.transform.position - CasterTransform.position;
 
             if (Vector3.Dot(mirrorForward, ownerToMirror) > 0f)
             {
                 // Owner is behind the mirror (Helix side)
-                PlayerHealth health = GetComponent<PlayerHealth>();
+                PlayerHealth health = GetOwnerComponent<PlayerHealth>();
                 if (health != null)
                 {
                     health.AddHealth(_killBonusHP);

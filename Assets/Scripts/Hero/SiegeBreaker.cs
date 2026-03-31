@@ -23,7 +23,9 @@ namespace ProjectZ.Hero.Jacob
 
         public override void Initialize(ProjectZ.Player.PlayerHeroController controller)
         {
-            base.Initialize(controller);
+            if (!BindOwner(controller))
+                return;
+
             Core.GameEvents.OnRoundEnd += HandleRoundEnd;
         }
 
@@ -38,7 +40,7 @@ namespace ProjectZ.Hero.Jacob
             if (!IsServerInitialized) return;
 
             // Place zone in front of the player, on the nearest wall via raycast
-            Transform ownerTransform = transform;
+            Transform ownerTransform = CasterTransform;
             if (Physics.Raycast(ownerTransform.position, ownerTransform.forward, out RaycastHit hit, 20f))
             {
                 Vector3 zonePos = hit.point;

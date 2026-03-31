@@ -35,18 +35,18 @@ namespace ProjectZ.Hero.Marcus
             _isActive = true;
 
             // Raycast to find grapple target
-            if (Physics.Raycast(transform.position, transform.forward, out RaycastHit hit, _maxRange, _grappleMask))
+            if (Physics.Raycast(CasterTransform.position, CasterTransform.forward, out RaycastHit hit, _maxRange, ResolveLayerMask(_grappleMask)))
             {
                 PlayerHealth targetHealth = hit.collider.GetComponentInParent<PlayerHealth>();
 
-                if (targetHealth != null && !targetHealth.IsDead.Value && targetHealth.OwnerId != OwnerId)
+                if (targetHealth != null && !targetHealth.IsDead.Value && targetHealth.OwnerId != OwnerConnectionId)
                 {
                     // Hit an enemy
-                    targetHealth.TakeDamage(_enemyDamage, OwnerId);
+                    targetHealth.TakeDamage(_enemyDamage, OwnerConnectionId);
 
                     var targetNob = hit.collider.GetComponentInParent<FishNet.Object.NetworkObject>();
                     if (targetNob != null && targetNob.Owner.IsValid)
-                        RpcApplySlow(targetNob.Owner, _slowDuration, _slowPercent);
+                        RpcApplySlow(targetNob.Owner, targetNob.gameObject, _slowDuration, _slowPercent);
 
                     Debug.Log($"[GrappleStrike] Hit enemy {targetHealth.OwnerId}: {_enemyDamage} dmg + {_slowPercent * 100}% slow");
                 }
@@ -69,46 +69,53 @@ namespace ProjectZ.Hero.Marcus
         [Server]
         private IEnumerator PullToPoint(Vector3 target)
         {
-            CharacterController cc = GetComponent<CharacterController>();
+            CharacterController cc = GetOwnerComponent<CharacterController>();
             if (cc == null) { _isActive = false; yield break; }
 
             cc.enabled = false;
 
-            float dist = Vector3.Distance(transform.position, target);
+            float dist = Vector3.Distance(CasterTransform.position, target);
             float travelTime = dist / _pullSpeed;
             float elapsed = 0f;
-            Vector3 start = transform.position;
+            Vector3 start = CasterTransform.position;
 
             while (elapsed < travelTime)
             {
-                transform.position = Vector3.Lerp(start, target, elapsed / travelTime);
+                CasterTransform.position = Vector3.Lerp(start, target, elapsed / travelTime);
                 elapsed += Time.deltaTime;
 
                 // Broadcast position
-                RpcSyncPosition(transform.position);
+                RpcSyncPosition(CasterTransform.position);
                 yield return null;
             }
 
-            transform.position = target;
+            CasterTransform.position = target;
             cc.enabled = true;
             _isActive = false;
             Debug.Log("[GrappleStrike] Pull complete.");
         }
 
         [TargetRpc]
-        private void RpcApplySlow(FishNet.Connection.NetworkConnection conn, float duration, float slowAmount)
+        private void RpcApplySlow(FishNet.Connection.NetworkConnection conn, GameObject targetPlayer, float duration, float slowAmount)
         {
-            StartCoroutine(SlowRoutine(duration));
+            if (targetPlayer != null)
+                StartCoroutine(SlowRoutine(targetPlayer, duration, slowAmount));
         }
 
-        private IEnumerator SlowRoutine(float duration)
+        private IEnumerator SlowRoutine(GameObject targetPlayer, float duration, float slowAmount)
         {
-            // Reduce movement speed on the client
-            var movement = GetComponent<PlayerMovement>();
-            // Slow effect would ideally be a multiplier on PlayerMovement
-            // For now we log it
-            Debug.Log($"[GrappleStrike] Slowed for {duration}s");
+            PlayerInputHandler input = targetPlayer.GetComponent<PlayerInputHandler>();
+            bool originalInputState = input != null && input.enabled;
+
+            if (input != null)
+                input.enabled = false;
+
+            Debug.Log($"[GrappleStrike] Heavy slow applied for {duration}s at {slowAmount * 100f:F0}% intensity.");
             yield return new WaitForSeconds(duration);
+
+            if (input != null)
+                input.enabled = originalInputState;
+
             Debug.Log("[GrappleStrike] Slow expired.");
         }
 

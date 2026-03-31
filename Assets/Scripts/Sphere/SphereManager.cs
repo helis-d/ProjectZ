@@ -71,6 +71,10 @@ namespace ProjectZ.Sphere
             if (CurrentState.Value != SphereState.Idle)
                 return false;
 
+            RoundManager roundManager = RoundManager.Instance;
+            if (roundManager != null && roundManager.CurrentState.Value != RoundManager.RoundState.ActionPhase)
+                return false;
+
             TeamManager tm = TeamManager.Instance;
             if (tm == null || tm.GetTeam(connId) != Team.Attacker)
                 return false;

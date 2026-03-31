@@ -96,30 +96,40 @@ namespace ProjectZ.Map
                 if (_buyZonePrefab != null)
                 {
                     GameObject bzObj = Instantiate(_buyZonePrefab, center, Quaternion.identity);
-                    ServerManager.Spawn(bzObj);
-                    
-                    var box = bzObj.GetComponent<BoxCollider>();
-                    if (box != null) box.size = size;
+                    BoxCollider box = bzObj.GetComponent<BoxCollider>();
+                    if (box == null)
+                        box = bzObj.AddComponent<BoxCollider>();
 
-                    // Set team affiliation from JSON "team" field
-                    // TODO: BuyZone component not yet implemented
-                    // var buyZone = bzObj.GetComponent<BuyZone>();
-                    // if (buyZone != null && zone.team != null)
-                    // {
-                    //     buyZone.Team = zone.team.ToLower() == "attacker"
-                    //         ? Team.Attacker
-                    //         : Team.Defender;
-                    // }
+                    box.size = size;
+                    box.isTrigger = true;
+
+                    BuyZone buyZone = bzObj.GetComponent<BuyZone>();
+                    if (buyZone == null)
+                        buyZone = bzObj.AddComponent<BuyZone>();
+
+                    Team zoneTeam = zone.team != null && zone.team.ToLower() == "attacker"
+                        ? Team.Attacker
+                        : Team.Defender;
+                    buyZone.Configure(zoneTeam);
+
+                    ServerManager.Spawn(bzObj);
                 }
 
                 // Build Barrier walls surrounding the buy zone
                 if (_barrierPrefab != null)
                 {
                     GameObject barrierObj = Instantiate(_barrierPrefab, center, Quaternion.identity);
-                    ServerManager.Spawn(barrierObj);
+                    BoxCollider box = barrierObj.GetComponent<BoxCollider>();
+                    if (box == null)
+                        box = barrierObj.AddComponent<BoxCollider>();
 
-                    var box = barrierObj.GetComponent<BoxCollider>();
-                    if (box != null) box.size = size;
+                    box.size = size;
+                    box.isTrigger = false;
+
+                    if (barrierObj.GetComponent<BarrierSystem>() == null)
+                        barrierObj.AddComponent<BarrierSystem>();
+
+                    ServerManager.Spawn(barrierObj);
                 }
             }
         }

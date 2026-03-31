@@ -14,7 +14,9 @@ namespace ProjectZ.Hero.Kant
     {
         public override void Initialize(PlayerHeroController controller)
         {
-            base.Initialize(controller);
+            if (!BindOwner(controller))
+                return;
+
             if (IsServerInitialized)
             {
                 GameEvents.OnPlayerDeath += HandlePlayerDeath;
@@ -52,10 +54,10 @@ namespace ProjectZ.Hero.Kant
                     {
                         PlayerHeroController victimHero = victimConn.FirstObject.GetComponent<PlayerHeroController>();
                         
-                        if (victimHero != null && victimHero.Hero != null && victimHero.Hero.ultimateAbilityPrefab != null)
+                        if (victimHero != null && victimHero.Hero != null && victimHero.Hero.ultimateId != UltimateAbilityId.None)
                         {
                             // Steal the ultimate!
-                            OwnerController.EquipStolenUltimate(victimHero.Hero.ultimateAbilityPrefab);
+                            OwnerController.EquipStolenUltimate(victimHero.Hero.ultimateId);
                             Debug.Log($"[IdentityTheft] Kant stole {victimHero.Hero.ultimateName} from Player {victimId}!");
                             
                             // Unsubscribe to avoid double stealing if multiple kills happen at once
