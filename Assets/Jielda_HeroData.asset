@@ -10,17 +10,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ad0c6a7142ea5314e937dcb396a3b26d, type: 3}
-  m_Name: Volt_HeroData
+  m_Name: Jielda_HeroData
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.HeroData
-  heroId: volt
-  heroName: Volt
-  heroTitle: The Disruptor
-  role: 6
-  gameplayRole: Chaos/Global
-  gddRosterOrder: 9
-  ultimateId: 9
-  ultimateName: System Failure
-  ultimateDescription: Compresses enemy vision to 5m, hides HUD, and mutes enemy voice comms for 5 seconds.
+  heroId: jielda
+  heroName: Jielda
+  heroTitle: The Hunter
+  role: 4
+  gameplayRole: Crowd Control
+  gddRosterOrder: 7
+  ultimateId: 7
+  ultimateName: Spirit Wolves
+  ultimateDescription: Sends spirit wolves to up to 3 damaged enemies, stunning them on impact for 1.5 seconds.
   ultimateChargePerKill: 15
   ultimateChargePerAssist: 10
   ultimateAbilityPrefab: {fileID: 0}

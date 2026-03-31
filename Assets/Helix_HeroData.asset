@@ -10,17 +10,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ad0c6a7142ea5314e937dcb396a3b26d, type: 3}
-  m_Name: Volt_HeroData
+  m_Name: Helix_HeroData
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.HeroData
-  heroId: volt
-  heroName: Volt
-  heroTitle: The Disruptor
-  role: 6
-  gameplayRole: Chaos/Global
-  gddRosterOrder: 9
-  ultimateId: 9
-  ultimateName: System Failure
-  ultimateDescription: Compresses enemy vision to 5m, hides HUD, and mutes enemy voice comms for 5 seconds.
+  heroId: helix
+  heroName: Helix
+  heroTitle: The Intel
+  role: 7
+  gameplayRole: Psychological Pressure
+  gddRosterOrder: 11
+  ultimateId: 11
+  ultimateName: One-Way Mirror
+  ultimateDescription: Deploys a one-way barrier that grants Helix safe sightlines and a health reward for kills taken behind it.
   ultimateChargePerKill: 15
   ultimateChargePerAssist: 10
   ultimateAbilityPrefab: {fileID: 0}

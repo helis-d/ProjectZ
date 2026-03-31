@@ -7,14 +7,17 @@ namespace ProjectZ.GameMode
 {
     /// <summary>
     /// Ranked mode (GDD Section 7):
-    /// 1:45 round time, side swap after round 12, and pistol rounds on rounds 1 and 13.
+    /// First to 13 rounds won, halftime after round 12, pistol rounds on rounds 1 and 13,
+    /// and win-by-two overtime.
     /// </summary>
     public class RankedGameMode : BaseGameMode
     {
-        public const int RegulationRoundCount = 13;
+        public const int RegulationRoundCap = 24;
         public const int HalfTimeRound = 12;
         public const int SecondPistolRound = 13;
-        public const int WinsRequired = 7;
+        public const int RegulationWinsRequired = 13;
+        public const int OvertimeLeadRequired = 2;
+        public const int OvertimeHardCap = 99;
         public const int StartingMoney = 800;
         public const int KillReward = 200;
         public const int RoundWinReward = 3000;
@@ -25,10 +28,14 @@ namespace ProjectZ.GameMode
         private int _defenderRoundWins;
         private RoundManager _roundManager;
 
+        public int AttackerRoundWins => _attackerRoundWins;
+        public int DefenderRoundWins => _defenderRoundWins;
+        public bool IsOvertimeActive => _attackerRoundWins >= HalfTimeRound && _defenderRoundWins >= HalfTimeRound && !HasWinner();
+
         public override void OnStartServer()
         {
             roundTimeLimit = 105f;
-            maxRounds = RegulationRoundCount;
+            maxRounds = RegulationRoundCap;
             enableMastery = true;
             enableAbilities = true;
             enableEconomy = true;
@@ -56,6 +63,14 @@ namespace ProjectZ.GameMode
 
             if (pistolRound)
                 ResetEconomyForPistolRound(StartingMoney);
+        }
+
+        public override bool CanStartRound(int nextRoundNumber)
+        {
+            if (HasWinner())
+                return false;
+
+            return nextRoundNumber <= OvertimeHardCap;
         }
 
         public override void CheckWinCondition()
@@ -92,15 +107,24 @@ namespace ProjectZ.GameMode
             if (roundNumber == HalfTimeRound && TryGetComponent(out TeamManager tm))
                 tm.SwapTeams();
 
-            if (_attackerRoundWins >= WinsRequired)
+            if (_attackerRoundWins > _defenderRoundWins && HasWinner())
                 GameEvents.InvokeMatchEnd(Team.Attacker);
-            else if (_defenderRoundWins >= WinsRequired)
+            else if (_defenderRoundWins > _attackerRoundWins && HasWinner())
                 GameEvents.InvokeMatchEnd(Team.Defender);
+            else if (IsOvertimeActive)
+                Debug.Log("[Ranked] Overtime active. Win by two.");
         }
 
         public bool IsPistolRound(int roundNumber)
         {
             return roundNumber == 1 || roundNumber == SecondPistolRound;
+        }
+
+        private bool HasWinner()
+        {
+            int bestScore = Mathf.Max(_attackerRoundWins, _defenderRoundWins);
+            int roundLead = Mathf.Abs(_attackerRoundWins - _defenderRoundWins);
+            return bestScore >= RegulationWinsRequired && roundLead >= OvertimeLeadRequired;
         }
 
         private int CountAlive(System.Collections.Generic.IReadOnlyList<int> ids)

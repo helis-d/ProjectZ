@@ -98,11 +98,17 @@ namespace ProjectZ.GameMode
 
         private IEnumerator RunMatch()
         {
-            int maxRounds = _gameMode != null ? _gameMode.MaxRounds : 13;
-
-            while (RoundNumber.Value < maxRounds && !_matchEnded)
+            while (!_matchEnded)
             {
-                RoundNumber.Value++;
+                int nextRoundNumber = RoundNumber.Value + 1;
+                bool canStartNextRound = _gameMode != null
+                    ? _gameMode.CanStartRound(nextRoundNumber)
+                    : nextRoundNumber <= 13;
+
+                if (!canStartNextRound)
+                    break;
+
+                RoundNumber.Value = nextRoundNumber;
                 yield return StartCoroutine(RunRound());
             }
 

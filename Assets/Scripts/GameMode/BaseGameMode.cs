@@ -57,6 +57,15 @@ namespace ProjectZ.GameMode
         /// <summary>Called when the round ends.</summary>
         public abstract void OnRoundEnd(Team winner, int roundNumber);
 
+        /// <summary>
+        /// Lets a mode decide if the next round should start.
+        /// Fixed-length modes can rely on maxRounds; overtime modes can override this.
+        /// </summary>
+        public virtual bool CanStartRound(int nextRoundNumber)
+        {
+            return nextRoundNumber <= maxRounds;
+        }
+
         protected void ApplyPistolRoundRules(bool isPistol)
         {
             foreach (var client in ServerManager.Clients.Values)

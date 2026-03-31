@@ -21,6 +21,9 @@ namespace ProjectZ.GameMode
         private int _defenderRoundWins;
         private RoundManager _roundManager;
 
+        public int AttackerRoundWins => _attackerRoundWins;
+        public int DefenderRoundWins => _defenderRoundWins;
+
         public override void OnStartServer()
         {
             roundTimeLimit = 90f;

@@ -10,17 +10,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ad0c6a7142ea5314e937dcb396a3b26d, type: 3}
-  m_Name: Volt_HeroData
+  m_Name: Samuel_HeroData
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.HeroData
-  heroId: volt
-  heroName: Volt
-  heroTitle: The Disruptor
-  role: 6
-  gameplayRole: Chaos/Global
-  gddRosterOrder: 9
-  ultimateId: 9
-  ultimateName: System Failure
-  ultimateDescription: Compresses enemy vision to 5m, hides HUD, and mutes enemy voice comms for 5 seconds.
+  heroId: samuel
+  heroName: Samuel
+  heroTitle: The Gambler
+  role: 1
+  gameplayRole: Risk/Aggressive
+  gddRosterOrder: 6
+  ultimateId: 6
+  ultimateName: Blood Pact
+  ultimateDescription: Bullets consume health, kills restore health, and Samuel gains bonus damage while critically low.
   ultimateChargePerKill: 15
   ultimateChargePerAssist: 10
   ultimateAbilityPrefab: {fileID: 0}

@@ -1,17 +1,15 @@
+using FishNet.Managing;
+using ProjectZ.Core;
+using ProjectZ.GameMode;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
-using ProjectZ.Core;
 
 namespace ProjectZ.UI
 {
     /// <summary>
-    /// Maç sonu sonuç ekranı. GameEvents.OnMatchEnd dinler.
-    /// ELO, öldürme/ölme sayıları, MVP bilgisi gösterir.
-    /// 
-    /// KURULUM:
-    /// 1. Canvas > MatchResults paneli oluştur (başlangıçta kapalı)
-    /// 2. Bu scripti panele ekle ve UI referanslarını bağla
+    /// Match end results screen. Listens to GameEvents.OnMatchEnd and presents
+    /// a local summary using the canonical mode score where possible.
     /// </summary>
     public class MatchResultsUI : MonoBehaviour
     {
@@ -28,7 +26,7 @@ namespace ProjectZ.UI
         [SerializeField] private TextMeshProUGUI _assistsText;
         [SerializeField] private TextMeshProUGUI _kdaText;
 
-        [Header("ELO Change")]
+        [Header("Progression")]
         [SerializeField] private TextMeshProUGUI _eloChangeText;
         [SerializeField] private TextMeshProUGUI _xpGainText;
 
@@ -40,7 +38,6 @@ namespace ProjectZ.UI
         [SerializeField] private Button _playAgainButton;
         [SerializeField] private Button _returnToLobbyButton;
 
-        // Lokal istatistikler (basit tracking)
         private int _localKills;
         private int _localDeaths;
         private int _localAssists;
@@ -71,9 +68,6 @@ namespace ProjectZ.UI
             GameEvents.OnPlayerAssist -= OnPlayerAssist;
         }
 
-        /// <summary>
-        /// Yerel oyuncunun connection ID'sini ayarlayın (spawn olduğunda).
-        /// </summary>
         public void SetLocalPlayer(int ownerId)
         {
             _localOwnerId = ownerId;
@@ -84,13 +78,20 @@ namespace ProjectZ.UI
 
         private void OnPlayerDeath(int victimId, int killerId)
         {
-            if (killerId == _localOwnerId) _localKills++;
-            if (victimId == _localOwnerId) _localDeaths++;
+            EnsureLocalOwnerId();
+
+            if (killerId == _localOwnerId)
+                _localKills++;
+            if (victimId == _localOwnerId)
+                _localDeaths++;
         }
 
         private void OnPlayerAssist(int assisterId, int victimId)
         {
-            if (assisterId == _localOwnerId) _localAssists++;
+            EnsureLocalOwnerId();
+
+            if (assisterId == _localOwnerId)
+                _localAssists++;
         }
 
         private void OnMatchEnd(Team winningTeam)
@@ -98,65 +99,121 @@ namespace ProjectZ.UI
             ShowResults(winningTeam);
         }
 
-        /// <summary>
-        /// Sonuç ekranını göster.
-        /// </summary>
         public void ShowResults(Team winningTeam)
         {
+            EnsureLocalOwnerId();
+
             if (_resultsPanel != null)
                 _resultsPanel.SetActive(true);
 
-            // Sonuç metni
-            bool isWinner = true; // Gerçek uygulamada oyuncunun takımı kontrol edilmeli
+            bool isWinner = TryGetLocalTeam(out Team myTeam) && myTeam == winningTeam;
+            bool overtimeWin = false;
+
+            RankedGameMode rankedMode = FindFirstObjectByType<RankedGameMode>();
+            if (rankedMode != null)
+                overtimeWin = rankedMode.IsOvertimeActive;
+
             if (_outcomeText != null)
             {
-                _outcomeText.text = isWinner ? "ZAFER!" : "YENİLGİ";
-                _outcomeText.color = isWinner ? new Color(0.2f, 0.9f, 0.3f) : new Color(0.9f, 0.2f, 0.2f);
+                if (isWinner && overtimeWin)
+                    _outcomeText.text = "OVERTIME VICTORY";
+                else if (isWinner)
+                    _outcomeText.text = "VICTORY";
+                else
+                    _outcomeText.text = "DEFEAT";
+
+                _outcomeText.color = isWinner
+                    ? new Color(0.2f, 0.9f, 0.3f)
+                    : new Color(0.9f, 0.2f, 0.2f);
             }
 
-            // İstatistikler
+            if (_scoreText != null)
+                _scoreText.text = BuildScoreText();
+
             if (_killsText != null) _killsText.text = _localKills.ToString();
             if (_deathsText != null) _deathsText.text = _localDeaths.ToString();
             if (_assistsText != null) _assistsText.text = _localAssists.ToString();
 
-            float kda = _localDeaths > 0 ? (float)(_localKills + _localAssists) / _localDeaths : _localKills + _localAssists;
-            if (_kdaText != null) _kdaText.text = $"KDA: {kda:F1}";
+            float kda = _localDeaths > 0
+                ? (float)(_localKills + _localAssists) / _localDeaths
+                : _localKills + _localAssists;
+            if (_kdaText != null)
+                _kdaText.text = $"KDA: {kda:F1}";
 
-            // ELO değişimi (basit hesaplama)
             int eloChange = isWinner ? 25 : -15;
             if (_eloChangeText != null)
             {
                 _eloChangeText.text = eloChange > 0 ? $"+{eloChange} ELO" : $"{eloChange} ELO";
-                _eloChangeText.color = eloChange > 0 ? new Color(0.3f, 1f, 0.4f) : new Color(1f, 0.3f, 0.3f);
+                _eloChangeText.color = eloChange > 0
+                    ? new Color(0.3f, 1f, 0.4f)
+                    : new Color(1f, 0.3f, 0.3f);
             }
 
-            // XP kazanımı
             int xpGain = _localKills * 200 + _localAssists * 100 + (isWinner ? 500 : 200);
-            if (_xpGainText != null) _xpGainText.text = $"+{xpGain} XP";
+            if (_xpGainText != null)
+                _xpGainText.text = $"+{xpGain} XP";
 
-            // MVP (burada basitçe en çok kill yapan kişi — production'da tüm oyunculardan kontrol edilmeli)
-            if (_mvpNameText != null) _mvpNameText.text = "MVP";
-            if (_mvpStatsText != null) _mvpStatsText.text = $"{_localKills}K / {_localDeaths}D / {_localAssists}A";
+            if (_mvpNameText != null)
+                _mvpNameText.text = "MVP";
+            if (_mvpStatsText != null)
+                _mvpStatsText.text = $"{_localKills}K / {_localDeaths}D / {_localAssists}A";
 
-            // Cursor'ı serbest bırak
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
 
-            Debug.Log($"[MatchResults] Shown. K:{_localKills} D:{_localDeaths} A:{_localAssists} ELO:{eloChange}");
+            Debug.Log($"[MatchResults] Displayed. Winner={winningTeam} LocalWinner={isWinner}");
         }
 
         private void OnPlayAgain()
         {
-            if (_resultsPanel != null) _resultsPanel.SetActive(false);
-            Debug.Log("[MatchResults] Play Again clicked — matchmaking'e yeniden gir.");
-            // NakamaManager.Instance.FindMatchAsync(2, 10, "*");
+            if (_resultsPanel != null)
+                _resultsPanel.SetActive(false);
+
+            Debug.Log("[MatchResults] Play Again clicked.");
         }
 
         private void OnReturnToLobby()
         {
-            if (_resultsPanel != null) _resultsPanel.SetActive(false);
+            if (_resultsPanel != null)
+                _resultsPanel.SetActive(false);
+
             Debug.Log("[MatchResults] Return to Lobby clicked.");
-            // UnityEngine.SceneManagement.SceneManager.LoadScene("Lobby");
+        }
+
+        private void EnsureLocalOwnerId()
+        {
+            if (_localOwnerId >= 0)
+                return;
+
+            if (NetworkManager.Instances.Count == 0)
+                return;
+
+            if (NetworkManager.Instances[0].ClientManager.Connection != null)
+                _localOwnerId = NetworkManager.Instances[0].ClientManager.Connection.ClientId;
+        }
+
+        private bool TryGetLocalTeam(out Team team)
+        {
+            team = Team.None;
+            TeamManager teamManager = TeamManager.Instance ?? FindFirstObjectByType<TeamManager>();
+            if (teamManager == null || _localOwnerId < 0)
+                return false;
+
+            team = teamManager.GetTeam(_localOwnerId);
+            return team != Team.None;
+        }
+
+        private static string BuildScoreText()
+        {
+            RankedGameMode rankedMode = UnityEngine.Object.FindFirstObjectByType<RankedGameMode>();
+            if (rankedMode != null)
+                return $"ATK {rankedMode.AttackerRoundWins} - {rankedMode.DefenderRoundWins} DEF";
+
+            FastFightMode fastFightMode = UnityEngine.Object.FindFirstObjectByType<FastFightMode>();
+            if (fastFightMode != null)
+                return $"ATK {fastFightMode.AttackerRoundWins} - {fastFightMode.DefenderRoundWins} DEF";
+
+            return "MATCH COMPLETE";
         }
     }
 }

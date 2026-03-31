@@ -10,17 +10,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ad0c6a7142ea5314e937dcb396a3b26d, type: 3}
-  m_Name: Volt_HeroData
+  m_Name: Jacob_HeroData
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.HeroData
-  heroId: volt
-  heroName: Volt
-  heroTitle: The Disruptor
-  role: 6
-  gameplayRole: Chaos/Global
-  gddRosterOrder: 9
-  ultimateId: 9
-  ultimateName: System Failure
-  ultimateDescription: Compresses enemy vision to 5m, hides HUD, and mutes enemy voice comms for 5 seconds.
+  heroId: jacob
+  heroName: Jacob
+  heroTitle: The Anchor
+  role: 0
+  gameplayRole: Defense/Strategy
+  gddRosterOrder: 1
+  ultimateId: 1
+  ultimateName: Siege Breaker
+  ultimateDescription: Creates a 3x3m siege window where Jacob's bullets ignore wall penetration drop-off for the current and next round.
   ultimateChargePerKill: 15
   ultimateChargePerAssist: 10
   ultimateAbilityPrefab: {fileID: 0}

@@ -27,6 +27,7 @@ namespace ProjectZ.Player
 
         public HeroData Hero => _selectedHero;
         public bool IsUltimateReady => UltimateCharge.Value >= 100f;
+        public bool IsPistolRound => _isPistolRound.Value;
 
         private void Awake()
         {
@@ -69,12 +70,20 @@ namespace ProjectZ.Player
         [Server]
         public void EquipHero(HeroData hero)
         {
+            if (hero == null)
+                return;
+
             _selectedHero = hero;
             UltimateCharge.Value = 0f;
             _originalUltimatePrefab = hero.ultimateAbilityPrefab;
             _hasStolenUltimate = false;
 
             EquipUltimatePrefab(_originalUltimatePrefab);
+
+            if (_originalUltimatePrefab == null && hero.ultimateId != UltimateAbilityId.None)
+            {
+                Debug.LogWarning($"[PlayerHeroController] {hero.heroName} has canonical ultimate data ({hero.ultimateId}) but no authored prefab is bound yet.");
+            }
         }
 
         [Server]
@@ -135,7 +144,13 @@ namespace ProjectZ.Player
         public bool TryActivateUltimate()
         {
             if (_activeUltimate == null)
+            {
+                if (_selectedHero != null && _selectedHero.HasConfiguredUltimate)
+                {
+                    Debug.LogWarning($"[PlayerHeroController] {_selectedHero.heroName} has canonical ultimate data but no authored runtime prefab. Activation is blocked until prefab authoring is complete.");
+                }
                 return false;
+            }
 
             if (!_hasStolenUltimate && _activeUltimate.GetType().Name == "IdentityTheft")
             {
@@ -177,7 +192,8 @@ namespace ProjectZ.Player
 
             if (killerId == OwnerId)
             {
-                AddCharge(15f);
+                float chargePerKill = _selectedHero != null ? _selectedHero.ultimateChargePerKill : 15f;
+                AddCharge(chargePerKill);
             }
         }
 
@@ -187,7 +203,8 @@ namespace ProjectZ.Player
 
             if (assisterId == OwnerId)
             {
-                AddCharge(10f); // GDD Section 8: Assist +10% charge
+                float chargePerAssist = _selectedHero != null ? _selectedHero.ultimateChargePerAssist : 10f;
+                AddCharge(chargePerAssist);
             }
         }
     }
