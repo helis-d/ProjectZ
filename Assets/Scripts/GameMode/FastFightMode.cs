@@ -7,10 +7,13 @@ namespace ProjectZ.GameMode
 {
     /// <summary>
     /// Fast & Fight mode (GDD Section 7):
-    /// 10 rounds, 1:30 round time, side swap after round 9.
+    /// 1:30 round time, side swap after round 9, and pistol rounds on rounds 1 and 10.
     /// </summary>
     public class FastFightMode : BaseGameMode
     {
+        public const int RegulationRoundCount = 10;
+        public const int HalfTimeRound = 9;
+        public const int SecondPistolRound = 10;
         public const int StartingMoney = 2000;
         private const int WinsRequired = 6;
 
@@ -21,7 +24,7 @@ namespace ProjectZ.GameMode
         public override void OnStartServer()
         {
             roundTimeLimit = 90f;
-            maxRounds = 10;
+            maxRounds = RegulationRoundCount;
             enableMastery = true;
             enableAbilities = true;
             enableEconomy = true;
@@ -81,7 +84,7 @@ namespace ProjectZ.GameMode
             else if (winner == Team.Defender)
                 _defenderRoundWins++;
 
-            if (roundNumber == 9 && TeamManager.Instance != null)
+            if (roundNumber == HalfTimeRound && TeamManager.Instance != null)
                 TeamManager.Instance.SwapTeams();
 
             if (_attackerRoundWins >= WinsRequired)
@@ -92,7 +95,7 @@ namespace ProjectZ.GameMode
 
         private bool IsPistolRound(int roundNumber)
         {
-            return roundNumber == 1 || roundNumber == maxRounds;
+            return roundNumber == 1 || roundNumber == SecondPistolRound;
         }
 
         private int CountAlive(System.Collections.Generic.IReadOnlyList<int> ids)

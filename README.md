@@ -9,6 +9,8 @@
 
 **ProjectZ** is a next-generation competitive 5v5 Tactical Hero Shooter. Blending the unforgiving, precision-based gunplay of classic competitive shooters with the chaotic, dynamic variables of hero abilities, ProjectZ is built from the ground up for eSports, competitive integrity, and a premium "game feel."
 
+Design note: the gameplay rules in this README are intended to mirror the canonical GDD. If a top-level summary here becomes stale, the GDD should be treated as the source of truth for mode flow, round rules, and hero design.
+
 ---
 
 ## 📖 Lore & Setting
@@ -24,7 +26,7 @@ ProjectZ strictly follows a high-stakes, competitive **Round-Based Economy** loo
 1. **Buy Phase (20 seconds):** Players use credits earned from kills (200 cr), objectives (300 cr), round wins (3000 cr), and round losses (base 1900 cr scaling with losing streaks) to purchase weapons, armor, and abilities natively through the `BuyMenuUI`. Economy maximum is capped at 9000 credits for Ranked matches.
 2. **Combat Phase (1:45 min):** A lethal 5v5 engagement. Time-to-Kill (TTK) is extremely low. A single well-placed headshot generally results in instant elimination.
 3. **Objective (The Sphere):** The Attacking team must plant the **Sphere** at designated Sites (A, B, or C). Planting requires 4.0 seconds. The Sphere has a 45-second detonation timer. The Defending team must defuse it (7.0 seconds base, 3.5 seconds with a kit). The explosive kill radius upon detonation spans 35 meters.
-4. **Round End & Progression:** The `RoundManager` tabulates ELO, updates the Scoreboard, and handles phase transitions. Match structure ranges from 13 rounds (Ranked) to 5 rounds (Fast-Fight).
+4. **Round End & Progression:** The `RoundManager` handles phase transitions, scoreboard refreshes, and mode-dependent win checks. Halftime swaps, pistol rounds, and match-end thresholds are mode-specific and should follow the canonical GDD ruleset.
 
 ```mermaid
 stateDiagram-v2
@@ -42,7 +44,7 @@ stateDiagram-v2
     
     CombatPhase --> RoundEnd : Win Condition Met
     RoundEnd --> BuyPhase : Distribute ELO & XP
-    RoundEnd --> MatchOver : 13 Rounds Won
+    RoundEnd --> MatchOver : Mode Win Condition Met
     MatchOver --> [*]
 ```
 
@@ -231,8 +233,8 @@ sequenceDiagram
 ## 🕹️ Game Modes
 
 ProjectZ supports a diverse suite of network-synchronized game modes via the `BaseGameMode` architecture context:
-1. **Ranked (Standard):** First to 13 rounds. Win-by-two overtime rules. Strict economy thresholds capping at 9,000 maximum funds. 
-2. **Fast Fight:** First to 5 rounds. Max 12,000 credits allocated immediately every consecutive round ignoring standard multiplier logic frameworks.
+1. **Ranked (Standard):** Main competitive ruleset with strict economy caps at 9,000, halftime after round 12, pistol rounds on rounds 1 and 13, and win-by-two overtime as defined by the GDD.
+2. **Fast Fight:** Shortened competitive ruleset with 1:30 rounds, accelerated economy, halftime after round 9, and pistol rounds on rounds 1 and 10.
 3. **Duel Chaos:** A hectic **2v2v2v2v2 (5 teams of 2)** continuous deathmatch model. Instant algorithmic respawns (3.0s delays) spanning 10-minutes. The designated duo reaching 100 combat kills claims extreme victory. Masteries completely stripped. 
 4. **Solo Tournament:** A gladiator-style **1v1 Arena Framework**. 5v5 lobby segments intelligently into specific observer states while Attackers and Defenders continuously queue for rotating synchronized individual 1v1 sequences center-stage until the designated organization secures 6 victories locking down the match entirely.
 

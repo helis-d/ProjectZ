@@ -7,10 +7,13 @@ namespace ProjectZ.GameMode
 {
     /// <summary>
     /// Ranked mode (GDD Section 7):
-    /// 13 rounds, 1:45 round time, side swap after round 12.
+    /// 1:45 round time, side swap after round 12, and pistol rounds on rounds 1 and 13.
     /// </summary>
     public class RankedGameMode : BaseGameMode
     {
+        public const int RegulationRoundCount = 13;
+        public const int HalfTimeRound = 12;
+        public const int SecondPistolRound = 13;
         public const int WinsRequired = 7;
         public const int StartingMoney = 800;
         public const int KillReward = 200;
@@ -25,7 +28,7 @@ namespace ProjectZ.GameMode
         public override void OnStartServer()
         {
             roundTimeLimit = 105f;
-            maxRounds = 13;
+            maxRounds = RegulationRoundCount;
             enableMastery = true;
             enableAbilities = true;
             enableEconomy = true;
@@ -86,7 +89,7 @@ namespace ProjectZ.GameMode
 
             Debug.Log($"[Ranked] Score -> ATK {_attackerRoundWins} : DEF {_defenderRoundWins}");
 
-            if (roundNumber == 12 && TryGetComponent(out TeamManager tm))
+            if (roundNumber == HalfTimeRound && TryGetComponent(out TeamManager tm))
                 tm.SwapTeams();
 
             if (_attackerRoundWins >= WinsRequired)
@@ -97,7 +100,7 @@ namespace ProjectZ.GameMode
 
         public bool IsPistolRound(int roundNumber)
         {
-            return roundNumber == 1 || roundNumber == maxRounds;
+            return roundNumber == 1 || roundNumber == SecondPistolRound;
         }
 
         private int CountAlive(System.Collections.Generic.IReadOnlyList<int> ids)
