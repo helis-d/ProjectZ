@@ -33,6 +33,9 @@ namespace ProjectZ.Player
         /// <summary>True on the frame the reload key is pressed.</summary>
         public bool ReloadPressed  { get; private set; }
 
+        /// <summary>True while the interact key is held.</summary>
+        public bool InteractHeld   { get; private set; }
+
         /// <summary>True on the frame the jump key is pressed.</summary>
         public bool JumpPressed    { get; private set; }
 
@@ -56,17 +59,6 @@ namespace ProjectZ.Player
         private void OnEnable()
         {
             _actions.Enable();
-
-            // Subscribe to button actions
-            _actions.Player.Sprint.performed  += _ => IsSprinting  = true;
-            _actions.Player.Sprint.canceled   += _ => IsSprinting  = false;
-
-            _actions.Player.Crouch.performed  += _ => IsCrouching  = true;
-            _actions.Player.Crouch.canceled   += _ => IsCrouching  = false;
-
-            _actions.Player.Attack.performed  += _ => FirePressed   = true;
-            _actions.Player.Attack.performed  += _ => FireHeld      = true;
-            _actions.Player.Attack.canceled   += _ => FireHeld      = false;
         }
 
         private void OnDisable()
@@ -77,14 +69,18 @@ namespace ProjectZ.Player
         private void Update()
         {
             // Read per-frame values
-            MoveInput    = _actions.Player.Move.ReadValue<Vector2>();
-            LookInput    = _actions.Player.Look.ReadValue<Vector2>();
-            ReloadPressed = _actions.Player.Interact.WasPressedThisFrame(); // mapped to Interact/R
+            MoveInput     = _actions.Player.Move.ReadValue<Vector2>();
+            LookInput     = _actions.Player.Look.ReadValue<Vector2>();
+            IsSprinting   = _actions.Player.Sprint.IsPressed();
+            IsCrouching   = _actions.Player.Crouch.IsPressed();
+            FirePressed   = _actions.Player.Attack.WasPressedThisFrame();
+            FireHeld      = _actions.Player.Attack.IsPressed();
+            ReloadPressed = _actions.Player.Reload.WasPressedThisFrame();
+            InteractHeld  = _actions.Player.Interact.IsPressed();
+            JumpPressed   = _actions.Player.Jump.WasPressedThisFrame();
 
-            // Reset one-frame flags
-            FirePressed  = false;
-            JumpPressed  = false;
-            DropPressed  = false;
+            // Reset prototype-only one-frame fallback flags
+            DropPressed = false;
             UltimatePressed = false;
             SlotAlphaPressed = -1;
 

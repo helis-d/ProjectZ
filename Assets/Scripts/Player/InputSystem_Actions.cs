@@ -1,6 +1,6 @@
 // AUTO-GENERATED — Manual equivalent of Unity's Input System code gen.
 // Source: InputSystem_Actions.inputactions
-// Actions exposed: Move, Look, Attack, Interact, Crouch, Jump, Previous, Next, Sprint
+// Actions exposed: Move, Look, Attack, Interact, Reload, Crouch, Jump, Previous, Next, Sprint
 // Namemap: Player map and UI map.
 
 using System;
@@ -29,6 +29,7 @@ public class InputSystem_Actions : IInputActionCollection2, IDisposable
     private InputAction _lookAction;
     private InputAction _attackAction;
     private InputAction _interactAction;
+    private InputAction _reloadAction;
     private InputAction _crouchAction;
     private InputAction _jumpAction;
     private InputAction _previousAction;
@@ -49,6 +50,7 @@ public class InputSystem_Actions : IInputActionCollection2, IDisposable
         _lookAction     = _playerMap.FindAction("Look",     throwIfNotFound: true);
         _attackAction   = _playerMap.FindAction("Attack",   throwIfNotFound: true);
         _interactAction = _playerMap.FindAction("Interact", throwIfNotFound: true);
+        _reloadAction   = _playerMap.FindAction("Reload",   throwIfNotFound: true);
         _crouchAction   = _playerMap.FindAction("Crouch",   throwIfNotFound: true);
         _jumpAction     = _playerMap.FindAction("Jump",     throwIfNotFound: true);
         _previousAction = _playerMap.FindAction("Previous", throwIfNotFound: true);
@@ -56,7 +58,7 @@ public class InputSystem_Actions : IInputActionCollection2, IDisposable
         _sprintAction   = _playerMap.FindAction("Sprint",   throwIfNotFound: true);
 
         Player = new PlayerActionsMap(_moveAction, _lookAction, _attackAction, _interactAction,
-                                      _crouchAction, _jumpAction, _previousAction, _nextAction, _sprintAction);
+                                      _reloadAction, _crouchAction, _jumpAction, _previousAction, _nextAction, _sprintAction);
         UI = new UIActionsMap(_uiMap);
     }
 
@@ -98,6 +100,7 @@ public class InputSystem_Actions : IInputActionCollection2, IDisposable
         public InputAction Look     { get; }
         public InputAction Attack   { get; }
         public InputAction Interact { get; }
+        public InputAction Reload   { get; }
         public InputAction Crouch   { get; }
         public InputAction Jump     { get; }
         public InputAction Previous { get; }
@@ -105,13 +108,14 @@ public class InputSystem_Actions : IInputActionCollection2, IDisposable
         public InputAction Sprint   { get; }
 
         internal PlayerActionsMap(InputAction move, InputAction look, InputAction attack,
-            InputAction interact, InputAction crouch, InputAction jump,
+            InputAction interact, InputAction reload, InputAction crouch, InputAction jump,
             InputAction previous, InputAction next, InputAction sprint)
         {
             Move     = move;
             Look     = look;
             Attack   = attack;
             Interact = interact;
+            Reload   = reload;
             Crouch   = crouch;
             Jump     = jump;
             Previous = previous;
@@ -172,6 +176,7 @@ namespace ProjectZ.Player
                 { ""name"": ""Look"",     ""type"": ""Value"",  ""id"": ""6b444451-8a00-4d00-a97e-f47457f736a8"", ""expectedControlType"": ""Vector2"", ""processors"": """", ""interactions"": """", ""initialStateCheck"": true },
                 { ""name"": ""Attack"",   ""type"": ""Button"", ""id"": ""6c2ab1b8-8984-453a-af3d-a3c78ae1679a"", ""expectedControlType"": ""Button"",  ""processors"": """", ""interactions"": """", ""initialStateCheck"": false },
                 { ""name"": ""Interact"", ""type"": ""Button"", ""id"": ""852140f2-7766-474d-8707-702459ba45f3"", ""expectedControlType"": ""Button"",  ""processors"": """", ""interactions"": ""Hold"", ""initialStateCheck"": false },
+                { ""name"": ""Reload"",   ""type"": ""Button"", ""id"": ""9f7bde6d-5e85-4d8d-9cf5-c2ec61086d14"", ""expectedControlType"": ""Button"",  ""processors"": """", ""interactions"": """", ""initialStateCheck"": false },
                 { ""name"": ""Crouch"",   ""type"": ""Button"", ""id"": ""27c5f898-bc57-4ee1-8800-db469aca5fe3"", ""expectedControlType"": ""Button"",  ""processors"": """", ""interactions"": """", ""initialStateCheck"": false },
                 { ""name"": ""Jump"",     ""type"": ""Button"", ""id"": ""f1ba0d36-48eb-4cd5-b651-1c94a6531f70"", ""expectedControlType"": ""Button"",  ""processors"": """", ""interactions"": """", ""initialStateCheck"": false },
                 { ""name"": ""Previous"", ""type"": ""Button"", ""id"": ""2776c80d-3c14-4091-8c56-d04ced07a2b0"", ""expectedControlType"": ""Button"",  ""processors"": """", ""interactions"": """", ""initialStateCheck"": false },
@@ -191,10 +196,12 @@ namespace ProjectZ.Player
                 { ""name"": """", ""id"": ""05f6913d-c316-48b2-a6bb-e225f14c7960"", ""path"": ""<Mouse>/leftButton"", ""groups"": ""; Keyboard&Mouse"", ""action"": ""Attack"", ""isComposite"": false, ""isPartOfComposite"": false },
                 { ""name"": """", ""id"": ""f2e9ba44-c423-42a7-ad56-f20975884794"", ""path"": ""<Keyboard>/leftShift"", ""groups"": ""Keyboard&Mouse"", ""action"": ""Sprint"", ""isComposite"": false, ""isPartOfComposite"": false },
                 { ""name"": """", ""id"": ""eb40bb66-4559-4dfa-9a2f-820438abb426"", ""path"": ""<Keyboard>/space"", ""groups"": ""Keyboard&Mouse"", ""action"": ""Jump"", ""isComposite"": false, ""isPartOfComposite"": false },
-                { ""name"": """", ""id"": ""36e52cba-0905-478e-a818-f4bfcb9f3b9a"", ""path"": ""<Keyboard>/c"", ""groups"": ""Keyboard&Mouse"", ""action"": ""Crouch"", ""isComposite"": false, ""isPartOfComposite"": false },
+                { ""name"": """", ""id"": ""36e52cba-0905-478e-a818-f4bfcb9f3b9a"", ""path"": ""<Keyboard>/leftCtrl"", ""groups"": ""Keyboard&Mouse"", ""action"": ""Crouch"", ""isComposite"": false, ""isPartOfComposite"": false },
                 { ""name"": """", ""id"": ""1534dc16-a6aa-499d-9c3a-22b47347b52a"", ""path"": ""<Keyboard>/1"", ""groups"": ""Keyboard&Mouse"", ""action"": ""Previous"", ""isComposite"": false, ""isPartOfComposite"": false },
                 { ""name"": """", ""id"": ""cbac6039-9c09-46a1-b5f2-4e5124ccb5ed"", ""path"": ""<Keyboard>/2"", ""groups"": ""Keyboard&Mouse"", ""action"": ""Next"", ""isComposite"": false, ""isPartOfComposite"": false },
-                { ""name"": """", ""id"": ""1c04ea5f-b012-41d1-a6f7-02e963b52893"", ""path"": ""<Keyboard>/e"", ""groups"": ""Keyboard&Mouse"", ""action"": ""Interact"", ""isComposite"": false, ""isPartOfComposite"": false }
+                { ""name"": """", ""id"": ""1c04ea5f-b012-41d1-a6f7-02e963b52893"", ""path"": ""<Keyboard>/e"", ""groups"": ""Keyboard&Mouse"", ""action"": ""Interact"", ""isComposite"": false, ""isPartOfComposite"": false },
+                { ""name"": """", ""id"": ""1db0d775-c19c-4c4d-87ae-d40f34070f0f"", ""path"": ""<Keyboard>/r"", ""groups"": ""Keyboard&Mouse"", ""action"": ""Reload"", ""isComposite"": false, ""isPartOfComposite"": false },
+                { ""name"": """", ""id"": ""49d080c3-bfaf-4dd7-bf1f-0c4d31816f42"", ""path"": ""<Keyboard>/rightCtrl"", ""groups"": ""Keyboard&Mouse"", ""action"": ""Crouch"", ""isComposite"": false, ""isPartOfComposite"": false }
             ]
         },
         {

@@ -47,14 +47,7 @@ namespace ProjectZ.Player
         {
             if (!IsOwner || _sphereManager == null || _teamManager == null) return;
 
-            bool tryingToInteract = _input.FireHeld; // Placeholder for interact key, or we can use another bind.
-                                                     // GDD usually maps Plant/Defuse to '4' or 'F' holding.
-                                                     // We assume FireHeld or ReloadPressed (Interact) is used. Let's use IsSprinting temporarily for this stub if no explicit Interact key exists.
-                                                     // For precision, let's assume `_input.FireHeld` is used for now when holding the bomb.
-
-            // Just mapped to an arbitrary button state that a player would hold
-            // In a real project: `_input.InteractHeld`
-            bool interactHeld = Input.GetKey(KeyCode.F);
+            bool interactHeld = _input != null && _input.InteractHeld;
 
             Team myTeam = _teamManager.GetTeam(OwnerId);
 
