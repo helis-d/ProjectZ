@@ -7,6 +7,8 @@
 
 # ProjectZ: The Ultimate Tactical Hero Shooter 🎯
 
+> **👋 Welcome A16Z Speedrun Reviewers:** Please see our **[Architecture Overview](Docs/Architecture.md)** for an in-depth dive into our Server-Authoritative Netcode, Lag Compensation (Hitbox Rewinding), and Dockerized FishNet Backend infrastructure.
+
 **ProjectZ** is a next-generation competitive 5v5 Tactical Hero Shooter. Blending the unforgiving, precision-based gunplay of classic competitive shooters with the chaotic, dynamic variables of hero abilities, ProjectZ is built from the ground up for eSports, competitive integrity, and a premium "game feel."
 
 Design note: the gameplay rules in this README are intended to mirror the canonical GDD. If a top-level summary here becomes stale, the GDD should be treated as the source of truth for mode flow, round rules, and hero design.
@@ -29,23 +31,23 @@ ProjectZ strictly follows a high-stakes, competitive **Round-Based Economy** loo
 4. **Round End & Progression:** The `RoundManager` handles phase transitions, scoreboard refreshes, and mode-dependent win checks. Halftime swaps, pistol rounds, and match-end thresholds are mode-specific and should follow the canonical GDD ruleset.
 
 ```mermaid
-stateDiagram-v2
-    [*] --> MatchStart
-    MatchStart --> BuyPhase : Initial Credits
-    BuyPhase --> CombatPhase : Barriers Drop
+flowchart TD
+    Start((Start)) --> MatchStart
+    MatchStart --> BuyPhase(Buy Phase: Initial Credits)
+    BuyPhase -->|Barriers Drop| CombatPhase
     
-    state CombatPhase {
-        [*] --> Skirmish
-        Skirmish --> SpherePlanted : Attacker Plants
-        Skirmish --> TeamEliminated : 5K Wipe
-        SpherePlanted --> SphereDefused : Defender Success
-        SpherePlanted --> SphereDetonated : Attacker Success
-    }
+    subgraph CombatPhase[Combat Phase]
+        direction TB
+        Skirmish --> SpherePlanted(Sphere Planted: Attacker Success)
+        Skirmish --> TeamEliminated(Team Eliminated: 5K Wipe)
+        SpherePlanted -->|Defender Success| SphereDefused(Sphere Defused)
+        SpherePlanted -->|Attacker Success| SphereDetonated(Sphere Detonated)
+    end
     
-    CombatPhase --> RoundEnd : Win Condition Met
-    RoundEnd --> BuyPhase : Distribute ELO & XP
-    RoundEnd --> MatchOver : Mode Win Condition Met
-    MatchOver --> [*]
+    CombatPhase -->|Win Condition Met| RoundEnd(Round End)
+    RoundEnd -->|Distribute ELO & XP| BuyPhase
+    RoundEnd -->|Mode Win Condition Met| MatchOver(Match Over)
+    MatchOver --> End((End))
 ```
 
 ---
@@ -108,24 +110,28 @@ Buffs are systematically categorized by weapon class scaling multipliers. Advanc
 *   **Level 5 (Max):** <font color="#F1C40F"><b>+15%</b></font> Fire Rate
 
 ```mermaid
-graph TD
-    classDef Event fill:#2c3e50,stroke:#34495e,stroke-width:2px,color:#fff;
-    classDef Success fill:#27ae60,stroke:#2ecc71,stroke-width:2px,color:#fff;
-    classDef Fail fill:#c0392b,stroke:#e74c3c,stroke-width:2px,color:#fff;
-    classDef Level fill:#8e44ad,stroke:#9b59b6,stroke-width:2px,color:#fff;
+flowchart TD
+    A[Player Engages in Duel] -->|Secures Headshot| B[+100 XP]
+    A -->|Dies to Headshot| C[-40 XP]
+    
+    B --> D{Hits 2000 XP Threshold?}
+    C --> E{Drops Below 2000 XP?}
+    
+    D -->|Yes| F[[Levels Up to Level III]]
+    E -->|Yes| G[[De-levels to Level II]]
+    
+    F -->|Apply Buffs| H[15% Faster Reload Speed applied live!]
+    G -->|Strip Buffs| I[Return to Standard Reload Speed]
 
-    A["Player Engages in Duel"]:::Event
-    A -->|"Secures Headshot"| B["+100 XP"]:::Success
-    A -->|"Dies to Headshot"| C["-40 XP"]:::Fail
-    
-    B --> D{"Hits 2000 XP Threshold?"}:::Event
-    C --> E{"Drops Below 2000 XP?"}:::Event
-    
-    D -->|"Yes"| F(["Levels Up to Level III"]):::Level
-    E -->|"Yes"| G(["De-levels to Level II"]):::Fail
-    
-    F -->|"Apply Buffs"| H["15% Faster Reload Speed applied live!"]:::Success
-    G -->|"Strip Buffs"| I["Return to Standard Reload Speed"]:::Event
+    style A fill:#2c3e50,stroke:#34495e,stroke-width:2px,color:#fff
+    style B fill:#27ae60,stroke:#2ecc71,stroke-width:2px,color:#fff
+    style C fill:#c0392b,stroke:#e74c3c,stroke-width:2px,color:#fff
+    style D fill:#2c3e50,stroke:#34495e,stroke-width:2px,color:#fff
+    style E fill:#2c3e50,stroke:#34495e,stroke-width:2px,color:#fff
+    style F fill:#8e44ad,stroke:#9b59b6,stroke-width:2px,color:#fff
+    style G fill:#c0392b,stroke:#e74c3c,stroke-width:2px,color:#fff
+    style H fill:#27ae60,stroke:#2ecc71,stroke-width:2px,color:#fff
+    style I fill:#2c3e50,stroke:#34495e,stroke-width:2px,color:#fff
 ```
 
 *Note: Dropping a weapon completely wipes its Mastery XP memory arrays. A newly picked-up weapon by any player will automatically reset to Level I. First and Half-time Pistol Rounds explicitly disable Masteries & Ultimates.*
@@ -249,16 +255,12 @@ Utilizing enterprise configurations for scaling matchmakers rapidly globally.
 * Employs internal database arrays via **CockroachDB**, tracking internal Player Profiling metrics heavily tied to scaling mathematical ELO configurations across specific matchmaking iterations natively.
 
 ```mermaid
-graph TD
-    classDef client fill:#2d3436,stroke:#74b9ff,stroke-width:2px,color:#fff;
-    classDef backend fill:#d35400,stroke:#e67e22,stroke-width:2px,color:#fff;
-    classDef server fill:#0984e3,stroke:#74b9ff,stroke-width:2px,color:#fff;
-    
-    C1[End-User Local Client Node]:::client
-    C2[Enemy Combatant Client Node]:::client
-    N[Nakama Web-Sockets Orchestrator]:::backend
-    DB[(CockroachDB Persistence Layer)]:::backend
-    FS[FishNet Headless Process Instance]:::server
+flowchart TD
+    C1[End-User Local Client Node]
+    C2[Enemy Combatant Client Node]
+    N[Nakama Web-Sockets Orchestrator]
+    DB[(CockroachDB Persistence Layer)]
+    FS[FishNet Headless Process Instance]
     
     C1 -->|Authenticate JWT Tokens| N
     C2 -->|Assign Matchmaking Tickets| N
@@ -266,6 +268,12 @@ graph TD
     N -->|Relay Assigned Game Port Topology| FS
     C1 <-->|Bi-Directional Heavy UDP State Synchronization| FS
     C2 <-->|Bi-Directional Heavy UDP State Synchronization| FS
+
+    style C1 fill:#2d3436,stroke:#74b9ff,stroke-width:2px,color:#fff
+    style C2 fill:#2d3436,stroke:#74b9ff,stroke-width:2px,color:#fff
+    style N fill:#d35400,stroke:#e67e22,stroke-width:2px,color:#fff
+    style DB fill:#d35400,stroke:#e67e22,stroke-width:2px,color:#fff
+    style FS fill:#0984e3,stroke:#74b9ff,stroke-width:2px,color:#fff
 ```
 
 ### The Procedural VFX Sub-Systems (Zero-Art Logic Flow)
@@ -276,20 +284,21 @@ An incredibly intense 10-tier feedback integration sequence driven entirely via 
 4. Executes complex UI Canvas behaviors initiating dense Red Vignettes spanning border parameters alongside directional blood splatter configurations depending intimately upon vector damage incoming data structures.
 
 ```mermaid
-graph LR
-    classDef trigger fill:#c0392b,color:#fff;
-    classDef bus fill:#f39c12,color:#fff;
-    classDef system fill:#27ae60,color:#fff;
-
-    W[Base Weapon Inheritance Structs]:::trigger -->|Trigger OnFire Vectors| E((Static Event Notification Bus System)):::bus
-    H[Player Health System Component]:::trigger -->|Trigger OnDamage Variables| E
+flowchart LR
+    W[Base Weapon Inheritance Structs] -->|Trigger OnFire Vectors| E((Static Event Notification Bus System))
+    H[Player Health System Component] -->|Trigger OnDamage Variables| E
     
-    E --> V[Combat Visual Effects Integration Pipeline]:::system
+    E --> V[Combat Visual Effects Integration Pipeline]
     
     V -->|Instantiate Dynamics| M(Procedural Point Lights)
     V -->|Access Memory Cache Pools| T(Object-Pooled Raycast Rendered Beams)
     V -->|Execute Mathematical Rotations| C(Perlin-Noise Actively Mutating Camera Matrix)
     V -->|Broadcast UI Changes| U(Red Scaled Warning Vectors & Damage Displays)
+
+    style W fill:#c0392b,color:#fff
+    style H fill:#c0392b,color:#fff
+    style E fill:#f39c12,color:#fff
+    style V fill:#27ae60,color:#fff
 ```
 
 ---
