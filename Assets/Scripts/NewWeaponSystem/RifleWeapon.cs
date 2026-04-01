@@ -29,6 +29,9 @@ public class RifleWeapon : BaseWeapon
         if (!isFullAuto)
         {
             // Burst mod (Bulldog)
+            if (currentBurst > 0)
+                return;
+
             StartCoroutine(BurstFire());
             return;
         }
@@ -62,12 +65,16 @@ public class RifleWeapon : BaseWeapon
 
     private System.Collections.IEnumerator BurstFire()
     {
+        currentBurst = 0;
         for (int i = 0; i < burstCount; i++)
         {
             if (currentAmmo <= 0) break;
+            currentBurst = i + 1;
             SingleShot();
             currentAmmo--;
             yield return new WaitForSeconds(burstDelay);
         }
+
+        currentBurst = 0;
     }
 }

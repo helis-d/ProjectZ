@@ -1,0 +1,13 @@
+{
+  "name": "ProjectZ.EditModeTests",
+  "rootNamespace": "ProjectZ.Tests",
+  "references": [
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "Assembly-CSharp"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "allowUnsafeCode": false
+}

@@ -187,7 +187,7 @@ namespace ProjectZ.Player
             Vector3 horizontalVelocity = move * speed;
 
             // 3. Gravity & Jump (Ground check via CharacterController)
-            bool isGrounded = _cc.isGrounded;
+            bool isGrounded = _cc.isGrounded || HasGroundBelow();
             if (isGrounded && _verticalVelocity < 0f)
                 _verticalVelocity = -2f; // Stick to ground
                 
@@ -214,6 +214,25 @@ namespace ProjectZ.Player
             _verticalVelocity  = rd.VerticalVelocity;
             _currentHeight     = rd.CurrentHeight;
             _cc.height         = rd.CurrentHeight;
+        }
+
+        private bool HasGroundBelow()
+        {
+            if (_groundMask.value == 0)
+                return false;
+
+            float castRadius = Mathf.Max(0.05f, _cc.radius * 0.9f);
+            float castDistance = Mathf.Max(_groundCheckDistance, 0.01f);
+            Vector3 castOrigin = transform.position + (_cc.center + Vector3.up * 0.05f);
+
+            return Physics.SphereCast(
+                castOrigin,
+                castRadius,
+                Vector3.down,
+                out _,
+                castDistance,
+                _groundMask,
+                QueryTriggerInteraction.Ignore);
         }
 
         // Update can be used for smooth visual interpolation if needed in the future

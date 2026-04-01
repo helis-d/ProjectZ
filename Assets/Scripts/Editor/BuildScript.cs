@@ -29,7 +29,7 @@ namespace ProjectZ.Editor
                 locationPathName = "Builds/LinuxServer/ProjectZ_Server.x86_64",
                 target = BuildTarget.StandaloneLinux64,
                 subtarget = (int)StandaloneBuildSubtarget.Server,
-                options = BuildOptions.EnableHeadlessMode | BuildOptions.CompressWithLz4HC
+                options = BuildOptions.CompressWithLz4HC
             };
 
             Debug.Log("[Build] Starting Linux Server Headless Build...");
