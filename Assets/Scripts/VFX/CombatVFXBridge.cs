@@ -61,7 +61,7 @@ namespace ProjectZ.VFX
                 _hitImpact = obj.AddComponent<HitImpactSystem>();
             }
 
-            _weaponManager = GetComponent<WeaponManager>();
+            _weaponManager = PlayerWeaponRuntimeBootstrap.EnsureWeaponRig(gameObject, GetComponent<WeaponManager>());
         }
 
         private void Update()

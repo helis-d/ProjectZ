@@ -40,7 +40,7 @@ public class WeaponAttachment : MonoBehaviour
 
         currentWeapon = weapon;
 
-        if (weapon == null || rightHandBone == null) return;
+        if (weapon == null || rightHandBone == null || weapon.data == null) return;
 
         // Silahı sağ el kemiğinin child'ı yap
         weapon.transform.SetParent(rightHandBone, false);
@@ -62,6 +62,7 @@ public class WeaponAttachment : MonoBehaviour
     void OnAnimatorIK(int layerIndex)
     {
         if (!useLeftHandIK || currentWeapon == null || characterAnimator == null) return;
+        if (currentWeapon.data == null) return;
         if (currentWeapon.data.weaponType == WeaponType.Knife) return; // bıçakta sol el IK yok
 
         // Sol el IK weight'i
@@ -84,6 +85,7 @@ public class WeaponAttachment : MonoBehaviour
     void LateUpdate()
     {
         if (currentWeapon == null || rightHandBone == null) return;
+        if (currentWeapon.data == null) return;
 
         // Silah zaten child olduğu için bu genelde gerekmez,
         // ama floating/glitch durumunda manuel override:

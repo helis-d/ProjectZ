@@ -47,7 +47,7 @@ namespace ProjectZ.Player
 
             _hitscanShooter = GetComponent<HitscanShooter>();
             _damageProcessor = GetComponent<DamageProcessor>();
-            _weaponManager = GetComponent<WeaponManager>(); 
+            _weaponManager = PlayerWeaponRuntimeBootstrap.EnsureWeaponRig(gameObject, GetComponent<WeaponManager>()); 
         }
 
         public override void OnStartClient()
@@ -97,10 +97,6 @@ namespace ProjectZ.Player
                 CmdStartReload(activeWeapon.data.weaponId); // A16Z Anti-Cheat: Sunucuya Rulo Değişimini Bildir
             }
             
-            if (Input.GetKeyDown(KeyCode.Alpha1)) _weaponManager.SwitchToSlot(0);
-            if (Input.GetKeyDown(KeyCode.Alpha2)) _weaponManager.SwitchToSlot(1);
-            if (Input.GetKeyDown(KeyCode.Alpha3)) _weaponManager.SwitchToSlot(2);
-
             if (_input.FireHeld)
                 activeWeapon.PrimaryAttack();
         }

@@ -32,12 +32,15 @@ public abstract class BaseWeapon : MonoBehaviour
 
     protected virtual void Awake()
     {
-        currentAmmo = data.magazineSize;
+        currentAmmo = data != null ? data.magazineSize : 0;
     }
 
     // ─── Temel API ───────────────────────────────────────────────
     public virtual void PrimaryAttack()
     {
+        if (data == null)
+            return;
+
         if (isReloading || Time.time < nextFireTime || currentAmmo <= 0)
         {
             if (currentAmmo <= 0) PlaySound(data.emptySound);
@@ -61,6 +64,7 @@ public abstract class BaseWeapon : MonoBehaviour
 
     public virtual void StartReload()
     {
+        if (data == null) return;
         if (isReloading || currentAmmo == data.magazineSize) return;
         StartCoroutine(ReloadCoroutine());
     }
@@ -69,7 +73,8 @@ public abstract class BaseWeapon : MonoBehaviour
     {
         gameObject.SetActive(true);
         weaponAnimator?.SetTrigger(AnimDraw);
-        PlaySound(data.drawSound);
+        if (data != null)
+            PlaySound(data.drawSound);
     }
 
     public virtual void Holster()
@@ -155,5 +160,11 @@ public abstract class BaseWeapon : MonoBehaviour
     {
         if (clip && TryGetComponent<AudioSource>(out var src))
             src.PlayOneShot(clip);
+    }
+
+    public virtual void InitializeRuntimeData(WeaponData runtimeData)
+    {
+        data = runtimeData;
+        currentAmmo = runtimeData != null ? runtimeData.magazineSize : 0;
     }
 }

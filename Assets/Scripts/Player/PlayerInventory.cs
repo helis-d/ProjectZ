@@ -61,12 +61,20 @@ namespace ProjectZ.Player
             if (_weaponManager == null)
                 _weaponManager = GetComponentInChildren<WeaponManager>();
 
+            _weaponManager = PlayerWeaponRuntimeBootstrap.EnsureWeaponRig(gameObject, _weaponManager);
+
             _activeSlot.OnChange += OnActiveSlotChanged;
         }
 
         public override void OnStartServer()
         {
             base.OnStartServer();
+
+            if (_defaultSecondary == null)
+                _defaultSecondary = PlayerWeaponRuntimeBootstrap.GetFallbackWeapon("pistol_classic");
+
+            if (_defaultMelee == null)
+                _defaultMelee = PlayerWeaponRuntimeBootstrap.GetFallbackWeapon("knife_tactical");
 
             if (_defaultSecondary != null)
             {
@@ -86,6 +94,7 @@ namespace ProjectZ.Player
         public override void OnStartClient()
         {
             base.OnStartClient();
+            _weaponManager = PlayerWeaponRuntimeBootstrap.EnsureWeaponRig(gameObject, _weaponManager);
             RefreshWeaponController();
         }
 
@@ -133,6 +142,12 @@ namespace ProjectZ.Player
         [ServerRpc]
         private void RequestDropWeapon(int slot)
         {
+            if (_weaponPickupPrefab == null)
+            {
+                Debug.LogWarning("[Inventory] No pickup prefab configured. Drop request ignored.");
+                return;
+            }
+
             string dropId = string.Empty;
 
             if (slot == 1)
@@ -210,7 +225,11 @@ namespace ProjectZ.Player
 
         private void RefreshWeaponController()
         {
-            if (_weaponManager == null) return;
+            if (_weaponManager == null)
+                _weaponManager = PlayerWeaponRuntimeBootstrap.EnsureWeaponRig(gameObject, _weaponManager);
+
+            if (_weaponManager == null)
+                return;
 
             string activeId = GetActiveWeaponId();
             WeaponData activeData = GetWeaponData(activeId);

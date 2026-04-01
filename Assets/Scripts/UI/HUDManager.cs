@@ -71,6 +71,8 @@ namespace ProjectZ.UI
                 Instance = this;
             else
                 Destroy(gameObject);
+
+            AutoWireRuntimeHud();
         }
 
         private void Update()
@@ -89,6 +91,8 @@ namespace ProjectZ.UI
             if (playerRoot == null)
                 return;
 
+            AutoWireRuntimeHud();
+
             _localHealth = playerRoot.GetComponent<PlayerHealth>();
             _localMastery = playerRoot.GetComponent<WeaponMasteryManager>();
             _localHero = playerRoot.GetComponent<PlayerHeroController>();
@@ -97,6 +101,40 @@ namespace ProjectZ.UI
             _roundManager = FindFirstObjectByType<RoundManager>();
             _rankedMode = FindFirstObjectByType<RankedGameMode>();
             _fastFightMode = FindFirstObjectByType<FastFightMode>();
+        }
+
+        private void AutoWireRuntimeHud()
+        {
+            if (_healthText == null) _healthText = FindChild<TextMeshProUGUI>("HealthText");
+            if (_armorText == null) _armorText = FindChild<TextMeshProUGUI>("ArmorText");
+            if (_ammoText == null) _ammoText = FindChild<TextMeshProUGUI>("AmmoText");
+            if (_modeText == null) _modeText = FindChild<TextMeshProUGUI>("ModeText");
+            if (_phaseText == null) _phaseText = FindChild<TextMeshProUGUI>("PhaseText");
+            if (_roundText == null) _roundText = FindChild<TextMeshProUGUI>("RoundText");
+            if (_scoreText == null) _scoreText = FindChild<TextMeshProUGUI>("ScoreText");
+            if (_heroIdentityText == null) _heroIdentityText = FindChild<TextMeshProUGUI>("HeroIdentityText");
+            if (_ultimateStatusText == null) _ultimateStatusText = FindChild<TextMeshProUGUI>("UltimateStatusText");
+            if (_healthBar == null) _healthBar = FindChild<Slider>("HealthBar");
+            if (_armorBar == null) _armorBar = FindChild<Slider>("ArmorBar");
+            if (_ultimateProgressImage == null) _ultimateProgressImage = FindChild<Image>("UltimateProgress");
+
+            if (_pistolRoundBadge == null)
+            {
+                Transform badge = transform.Find("PistolRoundBadge");
+                _pistolRoundBadge = badge != null ? badge.gameObject : null;
+            }
+
+            if (_overtimeBadge == null)
+            {
+                Transform badge = transform.Find("OvertimeBadge");
+                _overtimeBadge = badge != null ? badge.gameObject : null;
+            }
+        }
+
+        private T FindChild<T>(string childName) where T : Component
+        {
+            Transform child = transform.Find(childName);
+            return child != null ? child.GetComponent<T>() : null;
         }
 
         private void UpdateHealth()

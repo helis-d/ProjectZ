@@ -198,13 +198,16 @@ namespace ProjectZ.UI
 
         private WeaponData FindWeaponById(string weaponId)
         {
-            if (_weaponCatalog == null) return null;
-            foreach (var w in _weaponCatalog)
+            if (_weaponCatalog != null)
             {
-                if (w != null && w.weaponId == weaponId)
-                    return w;
+                foreach (var w in _weaponCatalog)
+                {
+                    if (w != null && w.weaponId == weaponId)
+                        return w;
+                }
             }
-            return null;
+
+            return WeaponCatalog.Instance?.GetById(weaponId);
         }
 
         private bool TryGetCurrentMode(out BaseGameMode mode)

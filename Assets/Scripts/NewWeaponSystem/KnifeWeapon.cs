@@ -31,6 +31,7 @@ public class KnifeWeapon : BaseWeapon
     // Sol tık: hızlı, düşük hasar
     public override void PrimaryAttack()
     {
+        if (data == null) return;
         if (Time.time < nextPrimaryTime || isReloading) return;
         nextPrimaryTime = Time.time + primaryCooldown;
         StartCoroutine(MeleeAttack(
@@ -43,6 +44,7 @@ public class KnifeWeapon : BaseWeapon
     // Sağ tık: yavaş, yüksek hasar (one-shot potansiyeli)
     public override void SecondaryAttack()
     {
+        if (data == null) return;
         if (Time.time < nextSecondaryTime || isReloading) return;
         nextSecondaryTime = Time.time + secondaryCooldown;
         StartCoroutine(MeleeAttack(
@@ -55,18 +57,27 @@ public class KnifeWeapon : BaseWeapon
     // Bıçakla reload/ammo yok
     public override void StartReload() { }
 
+    public override void InitializeRuntimeData(WeaponData runtimeData)
+    {
+        base.InitializeRuntimeData(runtimeData);
+        currentAmmo = int.MaxValue;
+    }
+
     protected override void Fire() { }     // BaseWeapon zorunlu kıldığı için boş
 
     private IEnumerator MeleeAttack(float range, float damage, int animHash)
     {
         weaponAnimator?.SetTrigger(animHash);
-        PlaySound(data.shootSound);     // bıçak çarpma sesi burada
+        if (data != null)
+            PlaySound(data.shootSound);     // bıçak çarpma sesi burada
 
         // Animasyonun vuruş frame'ini bekle
         yield return new WaitForSeconds(0.15f);
 
         Camera cam = Camera.main;
-        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+        Vector3 origin = cam != null ? cam.transform.position : transform.position;
+        Vector3 direction = cam != null ? cam.transform.forward : transform.forward;
+        Ray ray = new Ray(origin, direction);
 
         // Bıçak için SphereCast: daha toleranslı isabet alanı
         if (Physics.SphereCast(ray, 0.3f, out RaycastHit hit, range))

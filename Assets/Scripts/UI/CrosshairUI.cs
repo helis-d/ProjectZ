@@ -26,6 +26,11 @@ namespace ProjectZ.UI
         private CharacterController _localCC;
         private float _currentRecoil = 0f;
 
+        private void Awake()
+        {
+            TryResolveLines();
+        }
+
         public void BindLocalPlayer(GameObject playerRoot)
         {
             _localCC = playerRoot.GetComponent<CharacterController>();
@@ -41,6 +46,8 @@ namespace ProjectZ.UI
 
         private void Update()
         {
+            TryResolveLines();
+
             // Recover recoil over time
             if (_currentRecoil > 0f)
             {
@@ -70,6 +77,14 @@ namespace ProjectZ.UI
             if (_bottomLine != null) _bottomLine.anchoredPosition = new Vector2(0, -gap);
             if (_leftLine != null)   _leftLine.anchoredPosition   = new Vector2(-gap, 0);
             if (_rightLine != null)  _rightLine.anchoredPosition  = new Vector2(gap, 0);
+        }
+
+        private void TryResolveLines()
+        {
+            if (_topLine == null) _topLine = transform.Find("TopLine") as RectTransform;
+            if (_bottomLine == null) _bottomLine = transform.Find("BottomLine") as RectTransform;
+            if (_leftLine == null) _leftLine = transform.Find("LeftLine") as RectTransform;
+            if (_rightLine == null) _rightLine = transform.Find("RightLine") as RectTransform;
         }
     }
 }

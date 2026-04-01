@@ -1,48 +1,39 @@
-using ProjectZ.Weapon;
 using System.Collections.Generic;
+using ProjectZ.Weapon;
 using UnityEngine;
 
 /// <summary>
-/// Silah envanteri ve geçiş sistemi.
-/// Bu scripti Player objesine ekle.
+/// Weapon inventory and switching system for the active player.
 /// </summary>
 public class WeaponManager : MonoBehaviour
 {
     [Header("References")]
     public WeaponAttachment attachment;
-    public Transform weaponHolder;          // sahne içinde silahların spawn noktası
+    public Transform weaponHolder;
 
     [Header("Weapon Slots")]
-    public BaseWeapon primaryWeapon;        // Rifle veya Sniper
-    public BaseWeapon secondaryWeapon;      // Pistol
-    public BaseWeapon meleeWeapon;          // Knife
+    public BaseWeapon primaryWeapon;
+    public BaseWeapon secondaryWeapon;
+    public BaseWeapon meleeWeapon;
 
-    // Anlık aktif silah
     private BaseWeapon activeWeapon;
-    private int currentSlot = 0;            // 0=primary, 1=secondary, 2=melee
+    private int currentSlot;
+    private readonly List<BaseWeapon> weapons = new();
 
-    // Tüm silah listesi (kolay iterasyon için)
-    private List<BaseWeapon> weapons = new List<BaseWeapon>();
-
-    void Start()
+    private void Awake()
     {
-        // Silahları listeye ekle
-        if (primaryWeapon) weapons.Add(primaryWeapon);
-        if (secondaryWeapon) weapons.Add(secondaryWeapon);
-        if (meleeWeapon) weapons.Add(meleeWeapon);
-
-        // Başlangıçta tüm silahları gizle
-        foreach (var w in weapons)
-            w.gameObject.SetActive(false);
-
-        // Primary ile başla
-        SwitchToSlot(0);
+        RebuildWeaponCache();
     }
 
-    void Update()
+    private void Start()
     {
-        // GİRDİ ARTIK PLAYER COMBAT CONTROLLER TARAFINDAN YÖNETİLİYOR (Multiplayer Uyumlu)
-        // HandleInput() silindi.
+        RebuildWeaponCache();
+
+        foreach (BaseWeapon weapon in weapons)
+            weapon.gameObject.SetActive(false);
+
+        if (weapons.Count > 0)
+            SwitchToSlot(0);
     }
 
     public void HandleSwitchInput(int slotIndex)
@@ -52,30 +43,35 @@ public class WeaponManager : MonoBehaviour
 
     public void SwitchToSlot(int slot)
     {
-        if (slot < 0 || slot >= weapons.Count) return;
-        if (slot == currentSlot && activeWeapon != null) return;
+        RebuildWeaponCache();
+        if (slot < 0 || slot >= weapons.Count)
+            return;
+
+        if (slot == currentSlot && activeWeapon != null)
+            return;
 
         currentSlot = slot;
         BaseWeapon targetWeapon = weapons[slot];
+        if (targetWeapon == null)
+            return;
 
-        // Aktif silahı holster et
         if (activeWeapon != null && activeWeapon != targetWeapon)
             activeWeapon.Holster();
 
         activeWeapon = targetWeapon;
-        attachment.AttachWeapon(activeWeapon);
+        if (attachment != null)
+            attachment.AttachWeapon(activeWeapon);
     }
 
-    // Tam oto silahlar için trigger yönetimi
-    private void SetTrigger(bool held)
-    {
-        if (activeWeapon is RifleWeapon rifle) rifle.SetTrigger(held);
-        else if (activeWeapon is ShotgunWeapon shotgun) shotgun.SetTrigger(held);
-        else if (activeWeapon is PistolWeapon pistol) pistol.SetTrigger(held);
-    }
-
-    // UI için
     public BaseWeapon GetActiveWeapon() => activeWeapon;
     public int GetCurrentAmmo() => activeWeapon?.CurrentAmmo ?? 0;
     public int GetMaxAmmo() => activeWeapon?.data.magazineSize ?? 0;
+
+    public void RebuildWeaponCache()
+    {
+        weapons.Clear();
+        if (primaryWeapon != null) weapons.Add(primaryWeapon);
+        if (secondaryWeapon != null) weapons.Add(secondaryWeapon);
+        if (meleeWeapon != null) weapons.Add(meleeWeapon);
+    }
 }
