@@ -42,6 +42,7 @@ GameObject:
   - component: {fileID: 600100000000000017}
   - component: {fileID: 600100000000000018}
   - component: {fileID: 600100000000000019}
+  - component: {fileID: 600100000000000020}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -108,6 +109,7 @@ MonoBehaviour:
   - {fileID: 600100000000000017}
   - {fileID: 600100000000000018}
   - {fileID: 600100000000000019}
+  - {fileID: 600100000000000020}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -693,6 +695,21 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Hero.Marcus.GrappleStrike
   _componentIndexCache: 23
+  _addedNetworkObject: {fileID: 712034578787711353}
+  _networkObjectCache: {fileID: 712034578787711353}
+--- !u!114 &600100000000000020
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7768078978711683240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9fb6c34e8bd4496da6da6fb2d8576810, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectZ.Player.PlayerEquipment
+  _componentIndexCache: 24
   _addedNetworkObject: {fileID: 712034578787711353}
   _networkObjectCache: {fileID: 712034578787711353}
 --- !u!1001 &7388892586907033352

@@ -11,17 +11,18 @@ namespace ProjectZ.Player
     /// Evaluates if the player is in a valid site and on the correct team.
     /// </summary>
     [RequireComponent(typeof(PlayerInputHandler))]
+    [RequireComponent(typeof(PlayerEquipment))]
     public class SphereInteraction : NetworkBehaviour
     {
         // ─── State ────────────────────────────────────────────────────────
         private PlayerInputHandler _input;
+        private PlayerEquipment      _equipment;
         private TeamManager        _teamManager;
         private SphereManager      _sphereManager;
 
         private SphereSite _currentSite;
         private bool       _isInteracting;
         private float      _interactionTimer;
-        private bool       _hasDefuseKit = false; // Stub for economy/equipment
 
         // Local progress (0.0 to 1.0) for UI
         public float Progress => Mathf.Clamp01(_interactionTimer / Mathf.Max(0.01f, GetRequiredTime()));
@@ -29,6 +30,7 @@ namespace ProjectZ.Player
         private void Awake()
         {
             _input = GetComponent<PlayerInputHandler>();
+            _equipment = GetComponent<PlayerEquipment>();
         }
 
         public override void OnStartClient()
@@ -137,7 +139,10 @@ namespace ProjectZ.Player
             if (myTeam == Team.Attacker)
                 return _sphereManager.PlantTime;
             if (myTeam == Team.Defender)
-                return _sphereManager.GetDefuseTime(_hasDefuseKit);
+            {
+                bool hasKit = _equipment != null && _equipment.HasDefuseKit.Value;
+                return _sphereManager.GetDefuseTime(hasKit);
+            }
 
             return 999f;
         }

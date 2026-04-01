@@ -1,7 +1,9 @@
-﻿using System.Collections.Generic;
+using System.Collections;
+using System.Collections.Generic;
 using FishNet.Connection;
 using FishNet.Object;
 using ProjectZ.Core;
+using ProjectZ.Player;
 using UnityEngine;
 
 namespace ProjectZ.GameMode
@@ -29,13 +31,40 @@ namespace ProjectZ.GameMode
                 Destroy(gameObject);
                 return;
             }
+
             Instance = this;
+        }
+
+        public override void OnStartServer()
+        {
+            base.OnStartServer();
+            GameEvents.OnPlayerConnected += HandlePlayerConnected;
+            GameEvents.OnPlayerDisconnected += HandlePlayerDisconnected;
+            GameEvents.OnRoundStart += HandleRoundStart;
+
+            foreach (NetworkConnection conn in ServerManager.Clients.Values)
+            {
+                AssignTeam(conn);
+                StartCoroutine(InitializePlayerRoutine(conn.ClientId));
+            }
+        }
+
+        public override void OnStopServer()
+        {
+            base.OnStopServer();
+            GameEvents.OnPlayerConnected -= HandlePlayerConnected;
+            GameEvents.OnPlayerDisconnected -= HandlePlayerDisconnected;
+            GameEvents.OnRoundStart -= HandleRoundStart;
         }
 
         /// <summary>Auto-balance a new player into the smaller team.</summary>
         public Team AssignTeam(NetworkConnection conn)
         {
-            if (!IsServerInitialized) return Team.None;
+            if (!IsServerInitialized || conn == null)
+                return Team.None;
+
+            if (_playerTeams.TryGetValue(conn.ClientId, out Team existing))
+                return existing;
 
             Team assigned = _attackers.Count <= _defenders.Count ? Team.Attacker : Team.Defender;
 
@@ -99,6 +128,87 @@ namespace ProjectZ.GameMode
 
             if (defSpawns != null && defSpawns.Length > 0)
                 _defenderSpawns = defSpawns;
+        }
+
+        [Server]
+        private void HandlePlayerConnected(int clientId)
+        {
+            if (!ServerManager.Clients.TryGetValue(clientId, out NetworkConnection conn))
+                return;
+
+            AssignTeam(conn);
+            StartCoroutine(InitializePlayerRoutine(clientId));
+        }
+
+        [Server]
+        private void HandlePlayerDisconnected(int clientId)
+        {
+            RemovePlayer(clientId);
+        }
+
+        [Server]
+        private void HandleRoundStart(int _)
+        {
+            foreach (NetworkConnection conn in ServerManager.Clients.Values)
+            {
+                AssignTeam(conn);
+                ResetPlayerForRound(conn);
+            }
+        }
+
+        [Server]
+        private IEnumerator InitializePlayerRoutine(int clientId)
+        {
+            const float timeoutSeconds = 5f;
+            float elapsed = 0f;
+
+            while (elapsed < timeoutSeconds)
+            {
+                if (!ServerManager.Clients.TryGetValue(clientId, out NetworkConnection conn))
+                    yield break;
+
+                if (conn.FirstObject != null)
+                {
+                    ResetPlayerForRound(conn);
+                    yield break;
+                }
+
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            Debug.LogWarning($"[TeamManager] Timed out waiting for player object for client {clientId}.");
+        }
+
+        [Server]
+        private void ResetPlayerForRound(NetworkConnection conn)
+        {
+            if (conn == null || conn.FirstObject == null)
+                return;
+
+            GameObject playerObject = conn.FirstObject.gameObject;
+            Team team = GetTeam(conn.ClientId);
+            if (team == Team.None)
+                return;
+
+            PlayerHealth health = playerObject.GetComponent<PlayerHealth>();
+            if (health != null)
+                health.ResetHealth();
+
+            Transform spawnPoint = GetSpawnPoint(team);
+            if (spawnPoint != null)
+            {
+                CharacterController cc = playerObject.GetComponent<CharacterController>();
+                if (cc != null)
+                    cc.enabled = false;
+
+                playerObject.transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
+
+                if (cc != null)
+                    cc.enabled = true;
+            }
+
+            GameEvents.InvokePlayerSpawned(conn.ClientId);
         }
     }
 }

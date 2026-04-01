@@ -34,7 +34,9 @@ While the project stands at ~10K Lines of Code, the primary area of ongoing tech
 - Breaking down large controller scripts (`PlayerController`) into modular components (`PlayerMotor`, `PlayerPredictor`, `PlayerCombat`).
 - Preparing the integration of **Dependency Injection (DI)** for managers (Economy, UI, Match State) to increase unit-testability coverage.
 
-**Design / product:** Mode shipping tiers, mastery tuning, and ultimate counterplay are documented in [`DESIGN_PILLARS.md`](DESIGN_PILLARS.md), [`HERO_ULTIMATE_PIPELINE.md`](HERO_ULTIMATE_PIPELINE.md), and [`COMPETITIVE_INTEGRITY_PASS.md`](COMPETITIVE_INTEGRITY_PASS.md). Code: `GameModeProductInfo`, `WeaponMasteryManager.masteryHandlingStrength`.
+**Design / product:** Mode shipping tiers, mastery tuning, and ultimate counterplay are documented in [`DESIGN_PILLARS.md`](DESIGN_PILLARS.md), [`HERO_ULTIMATE_PIPELINE.md`](HERO_ULTIMATE_PIPELINE.md), and [`COMPETITIVE_INTEGRITY_PASS.md`](COMPETITIVE_INTEGRITY_PASS.md). Code: `GameModeProductInfo`, `WeaponMasteryManager.masteryHandlingStrength`. Weapon vs mastery ownership: [`WEAPON_SYSTEMS.md`](WEAPON_SYSTEMS.md).
+
+**Tests:** Edit Mode tests under `Assets/Tests/EditMode` (e.g. `LevelMultipliersBlendTests`) guard mastery blend math without a scene.
 
 ## 5. Deployment & CI/CD Pipeline
 

@@ -2,6 +2,7 @@ using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using ProjectZ.Core;
 using ProjectZ.GameMode;
+using ProjectZ.Player;
 using UnityEngine;
 
 namespace ProjectZ.Sphere
@@ -29,6 +30,8 @@ namespace ProjectZ.Sphere
         private bool _isPlanted;
         private int _activePlanterId = -1;
         private int _activeDefuserId = -1;
+        private float _defuseStartTime;
+        private bool _defuseUsedKit;
 
         private void Awake()
         {
@@ -141,6 +144,8 @@ namespace ProjectZ.Sphere
             if (!IsPlayerNearSphere(connId))
                 return false;
 
+            _defuseUsedKit = TryGetDefuseKit(connId, out bool kit) && kit;
+            _defuseStartTime = Time.time;
             _activeDefuserId = connId;
             CurrentState.Value = SphereState.Defusing;
             return true;
@@ -153,6 +158,7 @@ namespace ProjectZ.Sphere
             {
                 CurrentState.Value = SphereState.Active;
                 _activeDefuserId = -1;
+                _defuseStartTime = 0f;
             }
         }
 
@@ -168,9 +174,23 @@ namespace ProjectZ.Sphere
                 return;
             }
 
+            float required = GetDefuseTime(_defuseUsedKit);
+            if (Time.time < _defuseStartTime + required - 0.08f)
+            {
+                CancelDefuse();
+                return;
+            }
+
+            if (_defuseUsedKit && TryGetPlayerObject(_activeDefuserId, out GameObject playerObj))
+            {
+                PlayerEquipment equipment = playerObj.GetComponent<PlayerEquipment>();
+                equipment?.ConsumeDefuseKitAfterSuccessfulDefuse();
+            }
+
             CurrentState.Value = SphereState.Defused;
             _isPlanted = false;
             _activeDefuserId = -1;
+            _defuseStartTime = 0f;
 
             GameEvents.InvokeSphereDefused();
             Debug.Log("[Sphere] Defused.");
@@ -182,6 +202,7 @@ namespace ProjectZ.Sphere
             CurrentState.Value = SphereState.Exploded;
             _isPlanted = false;
             _activeDefuserId = -1;
+            _defuseStartTime = 0f;
 
             Collider[] colliders = Physics.OverlapSphere(transform.position, _killRadius);
             foreach (Collider col in colliders)
@@ -204,6 +225,7 @@ namespace ProjectZ.Sphere
             _isPlanted = false;
             _activePlanterId = -1;
             _activeDefuserId = -1;
+            _defuseStartTime = 0f;
         }
 
         private bool IsValidSite(string siteId)
@@ -249,6 +271,20 @@ namespace ProjectZ.Sphere
                 return false;
 
             player = conn.FirstObject.gameObject;
+            return true;
+        }
+
+        private bool TryGetDefuseKit(int connId, out bool hasKit)
+        {
+            hasKit = false;
+            if (!ServerManager.Clients.TryGetValue(connId, out var conn) || conn.FirstObject == null)
+                return false;
+
+            PlayerEquipment equipment = conn.FirstObject.GetComponent<PlayerEquipment>();
+            if (equipment == null)
+                return false;
+
+            hasKit = equipment.HasDefuseKit.Value;
             return true;
         }
 

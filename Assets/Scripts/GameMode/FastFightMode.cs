@@ -70,7 +70,7 @@ namespace ProjectZ.GameMode
             int defAlive = CountAlive(tm.Defenders);
 
             bool spherePlanted = false;
-            SphereManager sm = FindFirstObjectByType<SphereManager>();
+            SphereManager sm = SphereManager.Instance;
             if (sm != null && (sm.CurrentState.Value == SphereState.Active || sm.CurrentState.Value == SphereState.Defusing))
                 spherePlanted = true;
 

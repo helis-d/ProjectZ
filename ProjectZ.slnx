@@ -5,4 +5,5 @@
   <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="Gilzoide.SqliteNet.csproj" />
   <Project Path="Gilzoide.SqliteNet.Tests.Editor.csproj" />
+  <Project Path="ProjectZ.EditModeTests.csproj" />
 </Solution>

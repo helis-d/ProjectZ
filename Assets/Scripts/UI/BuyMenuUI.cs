@@ -1,4 +1,5 @@
 using FishNet.Object;
+using ProjectZ.Core;
 using ProjectZ.Economy;
 using ProjectZ.GameMode;
 using ProjectZ.Map;
@@ -20,6 +21,10 @@ namespace ProjectZ.UI
         [Tooltip("All purchasable weapons. Server uses this to look up WeaponData by ID.")]
         [SerializeField] private WeaponData[] _weaponCatalog;
 
+        [Header("Equipment (GDD Section 10 — Buy Menu Equipment)")]
+        [Tooltip("Credits for defuse kit. Align with the published GDD buy grid when available.")]
+        [SerializeField] private int _defuseKitPriceCredits = 400;
+
         private RoundManager _roundManager;
         private PlayerEconomy _localEconomy;
 
@@ -29,7 +34,7 @@ namespace ProjectZ.UI
             if (!IsOwner)
                 enabled = false;
 
-            _roundManager = FindFirstObjectByType<RoundManager>();
+            _roundManager = RoundManager.Instance ?? FindFirstObjectByType<RoundManager>();
             _localEconomy = GetComponent<PlayerEconomy>();
         }
 
@@ -70,6 +75,18 @@ namespace ProjectZ.UI
             CmdBuyWeapon(weaponId, price);
         }
 
+        /// <summary>Purchase defuse kit (defenders only, buy phase, GDD Section 7 timings 7.0s / 3.5s with kit).</summary>
+        public void RequestBuyDefuseKit()
+        {
+            if (_localEconomy != null && _localEconomy.CurrentMoney.Value < _defuseKitPriceCredits)
+            {
+                Debug.LogWarning("[BuyMenu] Insufficient funds for defuse kit.");
+                return;
+            }
+
+            CmdBuyDefuseKit(_defuseKitPriceCredits);
+        }
+
         [ServerRpc]
         private void CmdBuyWeapon(string weaponId, int requestedPrice)
         {
@@ -77,6 +94,9 @@ namespace ProjectZ.UI
                 _roundManager = RoundManager.Instance ?? FindFirstObjectByType<RoundManager>();
 
             if (_roundManager == null || _roundManager.CurrentState.Value != RoundManager.RoundState.BuyPhase)
+                return;
+
+            if (TryGetCurrentMode(out BaseGameMode mode) && !mode.EnableEconomy)
                 return;
 
             if (BuyZone.HasConfiguredZones() && !BuyZone.IsPlayerInsideFriendlyZone(gameObject, OwnerId))
@@ -105,11 +125,48 @@ namespace ProjectZ.UI
 
             // Add weapon to player inventory
             PlayerInventory inventory = GetComponent<PlayerInventory>();
-            if (inventory != null)
+            if (inventory == null)
             {
-                inventory.PickUpWeapon(purchasedWeapon);
-                Debug.Log($"[Server] Player {OwnerId} bought {purchasedWeapon.weaponName} for ${requestedPrice}");
+                Debug.LogError($"[BuyMenu] Player {OwnerId} has no PlayerInventory. Refunding {requestedPrice} credits.");
+                economy.AddMoney(requestedPrice);
+                return;
             }
+
+            inventory.PickUpWeapon(purchasedWeapon);
+            Debug.Log($"[Server] Player {OwnerId} bought {purchasedWeapon.weaponName} for ${requestedPrice}");
+        }
+
+        [ServerRpc]
+        private void CmdBuyDefuseKit(int requestedPrice)
+        {
+            if (requestedPrice != _defuseKitPriceCredits)
+                return;
+
+            if (_roundManager == null)
+                _roundManager = RoundManager.Instance ?? FindFirstObjectByType<RoundManager>();
+
+            if (_roundManager == null || _roundManager.CurrentState.Value != RoundManager.RoundState.BuyPhase)
+                return;
+
+            if (TryGetCurrentMode(out BaseGameMode mode) && !mode.EnableEconomy)
+                return;
+
+            if (BuyZone.HasConfiguredZones() && !BuyZone.IsPlayerInsideFriendlyZone(gameObject, OwnerId))
+                return;
+
+            if (TeamManager.Instance == null || TeamManager.Instance.GetTeam(OwnerId) != Team.Defender)
+                return;
+
+            PlayerEquipment equipment = GetComponent<PlayerEquipment>();
+            if (equipment == null || equipment.HasDefuseKit.Value)
+                return;
+
+            PlayerEconomy economy = GetComponent<PlayerEconomy>();
+            if (economy == null || !economy.TrySpendMoney(requestedPrice))
+                return;
+
+            equipment.GrantDefuseKit();
+            Debug.Log($"[Server] Player {OwnerId} bought defuse kit for ${requestedPrice}.");
         }
 
         private bool CanUseBuyMenu()
@@ -118,6 +175,9 @@ namespace ProjectZ.UI
                 _roundManager = RoundManager.Instance ?? FindFirstObjectByType<RoundManager>();
 
             if (_roundManager != null && _roundManager.CurrentState.Value != RoundManager.RoundState.BuyPhase)
+                return false;
+
+            if (TryGetCurrentMode(out BaseGameMode mode) && !mode.EnableEconomy)
                 return false;
 
             if (!BuyZone.HasConfiguredZones())
@@ -146,6 +206,22 @@ namespace ProjectZ.UI
             }
             return null;
         }
+
+        private bool TryGetCurrentMode(out BaseGameMode mode)
+        {
+            mode = null;
+
+            if (_roundManager != null && _roundManager.TryGetComponent(out mode))
+                return true;
+
+            if (RoundManager.Instance != null && RoundManager.Instance.TryGetComponent(out mode))
+                return true;
+
+            if (TeamManager.Instance != null && TeamManager.Instance.TryGetComponent(out mode))
+                return true;
+
+            mode = FindFirstObjectByType<BaseGameMode>();
+            return mode != null;
+        }
     }
 }
-

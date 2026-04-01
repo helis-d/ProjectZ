@@ -28,3 +28,4 @@ Menus and matchmaking should label **Experimental** modes clearly and may hide t
 
 - **Mode numbers** (round counts, caps, win conditions): [`README.md`](../README.md) “Canonical mode rules” + code constants in `RankedGameMode`, `FastFightMode`.
 - **Ultimate runtime wiring**: [`HERO_ULTIMATE_PIPELINE.md`](HERO_ULTIMATE_PIPELINE.md) and [`HeroData.cs`](../Assets/Scripts/Hero/HeroData.cs).
+- **Weapon / mastery split**: [`WEAPON_SYSTEMS.md`](WEAPON_SYSTEMS.md).

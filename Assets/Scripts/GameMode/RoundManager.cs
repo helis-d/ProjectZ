@@ -200,7 +200,7 @@ namespace ProjectZ.GameMode
 
         private bool IsSpherePlanted()
         {
-            SphereManager sm = FindFirstObjectByType<SphereManager>();
+            SphereManager sm = SphereManager.Instance;
             if (sm == null)
                 return false;
 
