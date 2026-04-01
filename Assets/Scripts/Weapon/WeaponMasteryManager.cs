@@ -15,6 +15,10 @@ namespace ProjectZ.Weapon
         [Tooltip("Assign one config per weapon class.")]
         [SerializeField] private WeaponTypeBuffConfig[] _buffConfigs;
 
+        [Header("Competitive balance")]
+        [Tooltip("1 = full GDD handling buffs. Lower (e.g. 0.35) pulls ADS/reload/move/fire-rate buffs toward neutral for ranked integrity. See Docs/COMPETITIVE_INTEGRITY_PASS.md.")]
+        [SerializeField] [Range(0f, 1f)] private float _masteryHandlingStrength = 1f;
+
         private readonly Dictionary<string, WeaponRuntimeData> _weaponData = new();
         private readonly Queue<int> _killsPerRound = new();
         private readonly Dictionary<WeaponType, WeaponTypeBuffConfig> _buffLookup = new();
@@ -178,6 +182,7 @@ namespace ProjectZ.Weapon
             if (_buffLookup.TryGetValue(wClass, out WeaponTypeBuffConfig config))
             {
                 LevelMultipliers multipliers = config.GetMultipliers(data.CurrentLevel);
+                multipliers = LevelMultipliers.BlendTowardIdentity(multipliers, _masteryHandlingStrength);
                 _equippedWeapon.ApplyBuffMultipliers(multipliers);
             }
         }

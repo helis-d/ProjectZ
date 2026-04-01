@@ -4,6 +4,7 @@ using FishNet.Managing.Timing; // NATIVE FISHNET TIMELINE
 using ProjectZ.Combat;
 using ProjectZ.UI;
 using ProjectZ.Weapon;
+using ProjectZ.Core.Interfaces;
 using UnityEngine;
 
 namespace ProjectZ.Player
@@ -18,7 +19,7 @@ namespace ProjectZ.Player
     [RequireComponent(typeof(DamageProcessor))]
     public class PlayerCombatController : NetworkBehaviour
     {
-        private PlayerInputHandler _input;
+        private IPlayerInput _input;
         private PlayerInventory _inventory;
         private PlayerHealth _health;
 
@@ -32,15 +33,15 @@ namespace ProjectZ.Player
 
         // ─── ANTI-CHEAT SUNUCU DENETLEYİCİLERİ ───────────────────────────
         private uint _lastServerFireTick;
-        private System.Collections.Generic.Dictionary<string, int> _serverAmmoTracker = new();
-        private System.Collections.Generic.HashSet<string> _reloadingWeapons = new();
+        private System.Collections.Generic.Dictionary<int, int> _serverAmmoTracker = new();
+        private System.Collections.Generic.HashSet<int> _reloadingWeapons = new();
 
         // SERVER SİSTEMİ İÇİN (BloodPact vb. yetenekler dinleyecek)
         public event System.Action OnServerFired;
 
         private void Awake()
         {
-            _input = GetComponent<PlayerInputHandler>();
+            _input = GetComponent<IPlayerInput>();
             _inventory = GetComponent<PlayerInventory>();
             _health = GetComponent<PlayerHealth>();
 
@@ -126,18 +127,32 @@ namespace ProjectZ.Player
             BaseWeapon activeWeapon = _weaponManager.GetActiveWeapon();
             if (activeWeapon == null || activeWeapon.data == null || activeWeapon.data.weaponId != weaponId) return;
 
-            if (_reloadingWeapons.Contains(weaponId)) return;
+            int instanceId = activeWeapon.GetInstanceID();
+
+            if (_reloadingWeapons.Contains(instanceId)) return;
             
-            _reloadingWeapons.Add(weaponId);
+            _reloadingWeapons.Add(instanceId);
             StartCoroutine(ServerReloadRoutine(activeWeapon));
         }
 
         private System.Collections.IEnumerator ServerReloadRoutine(BaseWeapon weapon)
         {
+            int instanceId = weapon.GetInstanceID();
+            
             // İstemcinin hile yapıp anında reload yollamasını engelle (Server-Authoritative Reload)
             yield return new WaitForSeconds(weapon.data.reloadTime);
-            _serverAmmoTracker[weapon.data.weaponId] = weapon.data.magazineSize;
-            _reloadingWeapons.Remove(weapon.data.weaponId);
+            
+            // A16Z Anti-Cheat: GHOST RELOAD FIX (Oyuncu silah değiştirdiyse mermiyi fulleme, hileyi iptal et)
+            if (_weaponManager != null && _weaponManager.GetActiveWeapon() == weapon)
+            {
+                _serverAmmoTracker[instanceId] = weapon.data.magazineSize;
+            }
+            else
+            {
+                Debug.LogWarning($"[Anti-Cheat] Player {OwnerId} tried to swap weapon during reload to exploit Ghost Reload. Reload Cancelled!");
+            }
+            
+            _reloadingWeapons.Remove(instanceId);
         }
 
         [ServerRpc]
@@ -148,6 +163,8 @@ namespace ProjectZ.Player
             BaseWeapon activeWeapon = _weaponManager.GetActiveWeapon();
             if (activeWeapon == null || activeWeapon.data == null || activeWeapon.data.weaponId != weaponId) return;
 
+            int instanceId = activeWeapon.GetInstanceID();
+
             // 1. A16Z ANTI-CHEAT: MAKRO & HIZLI ATEŞ (RAPID FIRE) ALGORİTMASI
             // Ateşler arası geçen süre silahın limitinden hızlıysa isteği çöpe at! (-0.05d pingleme toleransı)
             uint requiredTicks = TimeManager.TimeToTicks(activeWeapon.data.fireRate - 0.05f);
@@ -157,18 +174,18 @@ namespace ProjectZ.Player
                 return; 
             }
 
-            // 2. A16Z ANTI-CHEAT: SONSUZ MERMİ HİLESİ (INFINITE AMMO) ALGORİTMASI
-            if (!_serverAmmoTracker.ContainsKey(weaponId))
-                _serverAmmoTracker[weaponId] = activeWeapon.data.magazineSize;
+            // 2. A16Z ANTI-CHEAT: SONSUZ MERMİ HİLESİ (INFINITE AMMO) ALGORİTMASI ve Silah Kimliği Çatışması
+            if (!_serverAmmoTracker.ContainsKey(instanceId))
+                _serverAmmoTracker[instanceId] = activeWeapon.data.magazineSize;
 
-            if (_serverAmmoTracker[weaponId] <= 0 || _reloadingWeapons.Contains(weaponId))
+            if (_serverAmmoTracker[instanceId] <= 0 || _reloadingWeapons.Contains(instanceId))
             {
                 Debug.LogWarning($"[Anti-Cheat] Player {OwnerId} tried to fire without ammo or during reload.");
                 return;
             }
 
             // Doğrulandı: Mermiyi azalt ve süreyi kaydet
-            _serverAmmoTracker[weaponId]--;
+            _serverAmmoTracker[instanceId]--;
             _lastServerFireTick = TimeManager.Tick;
 
             if (_hitscanShooter == null || _damageProcessor == null) return;

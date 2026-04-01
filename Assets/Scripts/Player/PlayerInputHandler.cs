@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using ProjectZ.Core.Interfaces;
 
 namespace ProjectZ.Player
 {
@@ -9,7 +10,7 @@ namespace ProjectZ.Player
     /// Attach this alongside the generated InputSystem_Actions class.
     /// </summary>
     [RequireComponent(typeof(PlayerInput))]
-    public class PlayerInputHandler : MonoBehaviour
+    public class PlayerInputHandler : MonoBehaviour, IPlayerInput
     {
         // ─── Exposed Input State ──────────────────────────────────────────
         /// <summary>WASD / left-stick movement in local X/Z space.</summary>
@@ -92,6 +93,16 @@ namespace ProjectZ.Player
                 if (Keyboard.current.digit1Key.wasPressedThisFrame) SlotAlphaPressed = 1;
                 if (Keyboard.current.digit2Key.wasPressedThisFrame) SlotAlphaPressed = 2;
                 if (Keyboard.current.digit3Key.wasPressedThisFrame) SlotAlphaPressed = 3;
+            }
+            
+            // Console / Gamepad Fallback for Cross-Platform zero-risk testing!
+            if (Gamepad.current != null)
+            {
+                if (Gamepad.current.dpad.up.wasPressedThisFrame) DropPressed = true;
+                if (Gamepad.current.buttonNorth.wasPressedThisFrame) UltimatePressed = true; // Y on Xbox, Triangle on PS
+                if (Gamepad.current.dpad.left.wasPressedThisFrame) SlotAlphaPressed = 1;
+                if (Gamepad.current.dpad.right.wasPressedThisFrame) SlotAlphaPressed = 2;
+                if (Gamepad.current.dpad.down.wasPressedThisFrame) SlotAlphaPressed = 3;
             }
         }
     }

@@ -96,24 +96,59 @@ public abstract class BaseWeapon : MonoBehaviour
     protected void SpawnMuzzleFlash()
     {
         if (data.muzzleFlashPrefab && muzzlePoint)
-            Destroy(Instantiate(data.muzzleFlashPrefab, muzzlePoint.position, muzzlePoint.rotation), 0.05f);
+        {
+            if (ProjectZ.Core.VFXPoolManager.Instance != null)
+            {
+                GameObject obj = ProjectZ.Core.VFXPoolManager.Instance.Spawn(data.muzzleFlashPrefab, muzzlePoint.position, muzzlePoint.rotation);
+                ProjectZ.Core.VFXPoolManager.Instance.Release(obj, data.muzzleFlashPrefab, 0.05f);
+            }
+            else
+            {
+                Destroy(Instantiate(data.muzzleFlashPrefab, muzzlePoint.position, muzzlePoint.rotation), 0.05f);
+            }
+        }
     }
 
     protected void SpawnShellEject()
     {
         if (data.shellEjectPrefab && shellEjectPoint)
         {
-            GameObject shell = Instantiate(data.shellEjectPrefab, shellEjectPoint.position, shellEjectPoint.rotation);
+            GameObject shell;
+            if (ProjectZ.Core.VFXPoolManager.Instance != null)
+            {
+                shell = ProjectZ.Core.VFXPoolManager.Instance.Spawn(data.shellEjectPrefab, shellEjectPoint.position, shellEjectPoint.rotation);
+                ProjectZ.Core.VFXPoolManager.Instance.Release(shell, data.shellEjectPrefab, 3f);
+            }
+            else
+            {
+                shell = Instantiate(data.shellEjectPrefab, shellEjectPoint.position, shellEjectPoint.rotation);
+                Destroy(shell, 3f);
+            }
+
             if (shell.TryGetComponent<Rigidbody>(out var rb))
+            {
+                // Havuzdan gelen objenin momentumunu sıfırla ki üst üste binmesin
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
                 rb.AddForce(shellEjectPoint.right * 2f + shellEjectPoint.up * 1f, ForceMode.Impulse);
-            Destroy(shell, 3f);
+            }
         }
     }
 
     protected void SpawnImpact(Vector3 point, Vector3 normal)
     {
         if (data.bulletImpactPrefab)
-            Destroy(Instantiate(data.bulletImpactPrefab, point, Quaternion.LookRotation(normal)), 2f);
+        {
+            if (ProjectZ.Core.VFXPoolManager.Instance != null)
+            {
+                GameObject obj = ProjectZ.Core.VFXPoolManager.Instance.Spawn(data.bulletImpactPrefab, point, Quaternion.LookRotation(normal));
+                ProjectZ.Core.VFXPoolManager.Instance.Release(obj, data.bulletImpactPrefab, 2f);
+            }
+            else
+            {
+                Destroy(Instantiate(data.bulletImpactPrefab, point, Quaternion.LookRotation(normal)), 2f);
+            }
+        }
     }
 
     protected void PlaySound(AudioClip clip)

@@ -57,10 +57,11 @@ namespace ProjectZ.Hero
         [TextArea] public string ultimateDescription;
         public float ultimateChargePerKill = 15f;
         public float ultimateChargePerAssist = 10f;
-        
-        // This prefab will be instantiated and attached to the player when this hero is selected
+
+        [Tooltip("Optional designer reference. Runtime ultimates are resolved by ultimateId + UltimateAbility on the Player prefab. See Docs/HERO_ULTIMATE_PIPELINE.md.")]
         public GameObject ultimateAbilityPrefab;
 
+        /// <summary>True when an ultimate id and/or a prefab reference is set. Runtime still requires matching components on the spawned player.</summary>
         public bool HasConfiguredUltimate => ultimateAbilityPrefab != null || ultimateId != UltimateAbilityId.None;
     }
 }

@@ -1,0 +1,44 @@
+name: ProjectZ Unity Build Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+env:
+  UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+  UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+  UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+jobs:
+  build:
+    name: Build for Windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          lfs: true
+
+      - name: Cache Library
+        uses: actions/cache@v3
+        with:
+          path: Library
+          key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-
+
+      - name: Unity Build
+        uses: game-ci/unity-builder@v3
+        with:
+          projectPath: .
+          unityVersion: 6000.3.10f1
+          targetPlatform: StandaloneWindows64
+          buildName: ProjectZ-Windows
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: Build-Windows
+          path: build/StandaloneWindows64

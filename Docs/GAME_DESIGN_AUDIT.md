@@ -1,6 +1,7 @@
 # Project Z Game Design Audit
 
-Tarih: 2026-03-31
+Tarih: 2026-03-31  
+Guncelleme: 2026-04-01 — Asagidaki "kod ile hizalama" maddeleri README, `RankedGameMode` / `FastFightMode` / `EconomyManager` ve yeni `Docs/*.md` ile eslestirildi. Ayrintili canonical kurallar: [`DESIGN_PILLARS.md`](DESIGN_PILLARS.md), [`HERO_ULTIMATE_PIPELINE.md`](HERO_ULTIMATE_PIPELINE.md).
 
 ## Kisa Sonuc
 
@@ -30,9 +31,8 @@ Bugun repoda gercekten gorunen seyler:
 Bugun eksik veya urunlesmemis gorunen seyler:
 
 - aktif build icin tek sahne var: `Assets/Scenes/SampleScene.unity`
-- roster 13 hero olarak anlatiliyor ama author edilmis tek hero verisi `Assets/Volt_HeroData.asset`
-- o hero datasinda bile `ultimateAbilityPrefab` bagli degil
-- map/data-driven objective sistemi var ama buy zone tarafi halen TODO
+- roster icin 13 adet `*_HeroData.asset` vardir; `ultimateAbilityPrefab` alani cogu zaman bos tutulabilir cunku runtime ulti **`PlayerHeroController` + Player prefab uzerindeki `UltimateAbility` bilesenleri** ile cozulur (bkz. `HERO_ULTIMATE_PIPELINE.md`). Yine de vertical slice icin birkac kahraman tamamen oynanabilir dogrulanmalidir.
+- `BuyZone` senaryo icinde yapilandirildiginda calisir; tam harita akisi hala slice seviyesinde olabilir.
 - lobby to match flow tamam degil, menu tarafi halen prototip
 
 Sonuc: proje "tam 5v5 hero shooter" degil, "cekirdek loop'u kurulmaya calisan prototip" olarak ele alinmali.
@@ -85,13 +85,13 @@ Ranked, Fast Fight, Duel Chaos ve Solo Tournament ayni anda tasarlaniyor; fakat 
 Rekabetci oyunda ana mod oturmadan yan modlar eklemek, denge ve tempo problemlerini carpani buyutur.
 
 ### 5. Kod ve dokuman arasinda urun karari seviyesinde celiskiler var
-Bu kisim tasarim acisindan kritik:
+Bu kisim tasarim acisindan kritik (2026-04-01 duzeltmesi):
 
-- README Fast Fight'i 5 round diyor, kod 10 round yapiyor
-- README Ranked icin overtime diyor, kodda belirgin overtime akisi yok
-- Ranked "13 round" dili ile koddaki `WinsRequired = 7` ayni urun anlatimini vermiyor
+- README artik **Fast Fight** icin 10 regulation round, 9. round devre ve pistol 1/10 ile kodu eslestiriyor; ekonomi ust siniri **12.000** ve ilk **6** round galibiyeti maci bitiriyor (`FastFightMode`, `EconomyManager`).
+- **Ranked** icin `RankedGameMode`: regulation galibiyet **13**, win-by-two (`OvertimeLeadRequired`), overtime kosulu `IsOvertimeActive`, maksimum round **24** — README "Canonical mode rules" tablosu ile hizali.
+- Eski taslaklarda gorunen "5 round Fast Fight" / "WinsRequired = 7" ifadeleri **guncel degil**; tek kaynak olarak README + kod sabitleri kullanilmalidir.
 
-Bu tip farklar ekipte su soruyu dogurur: gercek oyun kurali hangisi?
+Kalan risk: GDD PDF/README disinda daginik notlar varsa, onlari da ayni tabloya cekmek.
 
 ## Profesyonel Degerlendirme
 
@@ -135,6 +135,8 @@ Onerim:
 - fire rate ve hareket hizi gibi direkt duel avantajlarini azalt
 
 Tactical oyunda "kazanan daha da kolay kazansin" hissi tehlikelidir.
+
+**Uygulama notu (2026-04):** `WeaponMasteryManager` uzerinde `masteryHandlingStrength` (0-1) ile config bufflari **notr**e dogru karistirilabilir; ayrintilar `COMPETITIVE_INTEGRITY_PASS.md`.
 
 ### 4. Hero roster'i kucult ve tamamla
 13 eksik hero yerine 3 veya 4 tam hazir hero daha degerlidir.

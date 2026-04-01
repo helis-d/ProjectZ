@@ -3,6 +3,7 @@ using FishNet.Object;
 using FishNet.Object.Prediction;
 using FishNet.Transporting;
 using ProjectZ.Settings;
+using ProjectZ.Core.Interfaces;
 
 namespace ProjectZ.Player
 {
@@ -57,7 +58,7 @@ namespace ProjectZ.Player
 
         // ─── Components ───────────────────────────────────────────────────
         private CharacterController _cc;
-        private PlayerInputHandler  _input;
+        private IPlayerInput _input;
 
         // ─── State (Will be Reconciled) ───────────────────────────────────
         private float _verticalVelocity;
@@ -74,7 +75,7 @@ namespace ProjectZ.Player
         private void Awake()
         {
             _cc    = GetComponent<CharacterController>();
-            _input = GetComponent<PlayerInputHandler>();
+            _input = GetComponent<IPlayerInput>();
 
             _cc.height = _standHeight;
             _currentHeight = _standHeight;

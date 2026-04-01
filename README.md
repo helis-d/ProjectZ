@@ -11,7 +11,7 @@
 
 **ProjectZ** is a next-generation competitive 5v5 Tactical Hero Shooter. Blending the unforgiving, precision-based gunplay of classic competitive shooters with the chaotic, dynamic variables of hero abilities, ProjectZ is built from the ground up for eSports, competitive integrity, and a premium "game feel."
 
-Design note: the gameplay rules in this README are intended to mirror the canonical GDD. If a top-level summary here becomes stale, the GDD should be treated as the source of truth for mode flow, round rules, and hero design.
+Design note: the gameplay rules in this README are intended to mirror the canonical GDD. If a top-level summary here becomes stale, the GDD should be treated as the source of truth for mode flow, round rules, and hero design. **Product pillars, mode shipping tiers, and competitive-tuning notes:** see [`Docs/DESIGN_PILLARS.md`](Docs/DESIGN_PILLARS.md), [`Docs/HERO_ULTIMATE_PIPELINE.md`](Docs/HERO_ULTIMATE_PIPELINE.md), and [`Docs/COMPETITIVE_INTEGRITY_PASS.md`](Docs/COMPETITIVE_INTEGRITY_PASS.md).
 
 ---
 
@@ -243,6 +243,19 @@ ProjectZ supports a diverse suite of network-synchronized game modes via the `Ba
 2. **Fast Fight:** Shortened competitive ruleset with 1:30 rounds, accelerated economy, halftime after round 9, and pistol rounds on rounds 1 and 10.
 3. **Duel Chaos:** A hectic **2v2v2v2v2 (5 teams of 2)** continuous deathmatch model. Instant algorithmic respawns (3.0s delays) spanning 10-minutes. The designated duo reaching 100 combat kills claims extreme victory. Masteries completely stripped. 
 4. **Solo Tournament:** A gladiator-style **1v1 Arena Framework**. 5v5 lobby segments intelligently into specific observer states while Attackers and Defenders continuously queue for rotating synchronized individual 1v1 sequences center-stage until the designated organization secures 6 victories locking down the match entirely.
+
+### Canonical mode rules (code-synced)
+
+Values below match `RankedGameMode`, `FastFightMode`, and `EconomyManager` unless the GDD explicitly overrides.
+
+| Mode | Tier | Economy cap | Round / match structure |
+|------|------|-------------|-------------------------|
+| **Ranked** | Primary | 9,000 credits | First to **13** round wins with **≥2** round lead after regulation; overtime when both teams are at **12** (see `RankedGameMode`); regulation round cap **24**; halftime after round **12**; pistol rounds **1** and **13**; 105s combat phase. |
+| **Fast Fight** | Secondary | **12,000** credits (1.5× kill/win/loss/sphere rewards vs base) | **10** regulation rounds; first to **6** round wins ends the match; halftime after round **9**; pistol rounds **1** and **10**; **90s** combat phase. |
+| **Duel Chaos** | Experimental | Disabled | Deathmatch rules in `DuelChaosMode`, mastery/abilities/economy off. |
+| **Solo Tournament** | Experimental | Disabled | Arena duel flow in `SoloTournamentMode`, mastery/abilities/economy off. |
+
+Shipping tiers are also exposed in code via `GameModeProductInfo` (see [`Docs/DESIGN_PILLARS.md`](Docs/DESIGN_PILLARS.md)).
 
 ---
 

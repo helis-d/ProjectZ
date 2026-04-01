@@ -32,6 +32,23 @@ namespace ProjectZ.Weapon
         {
             ads = 1f, reload = 1f, move = 1f, fireRate = 1f, draw = 1f
         };
+
+        /// <summary>
+        /// Pulls handling bonuses toward neutral (1.0). strength=1 preserves m; strength=0 returns Default.
+        /// Use for competitive integrity tuning without editing per-level config assets.
+        /// </summary>
+        public static LevelMultipliers BlendTowardIdentity(LevelMultipliers m, float strength)
+        {
+            strength = Mathf.Clamp01(strength);
+            return new LevelMultipliers
+            {
+                ads = 1f + (m.ads - 1f) * strength,
+                reload = 1f + (m.reload - 1f) * strength,
+                move = 1f + (m.move - 1f) * strength,
+                fireRate = 1f + (m.fireRate - 1f) * strength,
+                draw = 1f + (m.draw - 1f) * strength
+            };
+        }
     }
 
     /// <summary>
