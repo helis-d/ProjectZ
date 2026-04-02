@@ -21,6 +21,22 @@ Set in a near-future cyberpunk metropolis fractured by the discovery of "Z-Energ
 
 ---
 
+## Vision
+
+**Project Z turns pure aim into power.** It takes the fear, lethality, and round tension of elite tactical shooters, then fuses them with Weapon Mastery and performance-charged hero ultimates to create a faster, harder-hitting competitive FPS Hero Shooter.
+
+The core rule is simple: **gun skill stays sacred**. Abilities do not replace fundamentals; they reward them. Clean duels, disciplined peeks, map pressure, and clutch execution fuel both mastery tempo and ultimate access, so strong mechanics do more than win the fight, they shape the rounds that follow.
+
+That is where Project Z breaks away from both Valorant and CS2.
+
+- **Compared to Valorant,** Project Z is less about slow utility choreography and more about converting sharp mechanics into immediate momentum. Ultimates are not passive spectacle on a timer; they are earned through impact.
+- **Compared to CS2,** Project Z keeps the punishment, economy tension, and low-TTK discipline of tactical FPS combat, but accelerates the pace through hero identity, mastery spikes, and more explosive round swings.
+
+This makes Project Z powerful for both players and spectators. Every round carries layered stakes: economy, objective pressure, hero timing, mastery progression, and rank pressure. That naturally creates the moments people want to play, watch, clip, and cast, from precision openers and clutch retakes to overtime rounds decided by a single duel.
+
+The long-term vision is clear: **a competitive shooter where pure aim wins the duel, mastery shapes the rhythm, and hero power turns momentum into spectacle.**
+
+---
 ## 🎮 Core Gameplay Loop
 
 ProjectZ strictly follows a high-stakes, competitive **Round-Based Economy** loop.
