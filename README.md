@@ -52,6 +52,153 @@ flowchart TD
 
 ---
 
+## Ranked Progression System
+
+ProjectZ includes a canonical competitive rank model designed for long-term ladder integrity rather than short-term volatility. The source of truth for this system lives in [`Assets/Scripts/GameMode/CompetitiveRankSystem.cs`](Assets/Scripts/GameMode/CompetitiveRankSystem.cs), while persistence and profile integration live in [`Assets/Scripts/Network/NakamaManager.cs`](Assets/Scripts/Network/NakamaManager.cs). Rank is never stored as a fragile standalone label. Instead, the visible rank is always derived from the player's current competitive rating (`elo`), which keeps progression deterministic, auditable, and safe to rebalance.
+
+### Ranked Ladder
+
+The ladder order from lowest to highest is:
+
+1. **Baslangic**
+2. **Bronz**
+3. **Gumus**
+4. **Altin**
+5. **Savasci**
+6. **Kral**
+7. **Baron**
+8. **Madersah**
+9. **Prestij**
+
+Division rules:
+
+- `Baslangic` through `Kral` use **I - II - III**
+- `Baron`, `Madersah`, and `Prestij` use **I - II - III - IV**
+
+Every division spans a fixed **100 rating** block, producing a clean, readable competitive ladder.
+
+| Rank Band | Divisions | Rating Floor |
+| :--- | :---: | ---: |
+| **Baslangic** | I, II, III | 1000 |
+| **Bronz** | I, II, III | 1300 |
+| **Gumus** | I, II, III | 1600 |
+| **Altin** | I, II, III | 1900 |
+| **Savasci** | I, II, III | 2200 |
+| **Kral** | I, II, III | 2500 |
+| **Baron** | I, II, III, IV | 2800 |
+| **Madersah** | I, II, III, IV | 3200 |
+| **Prestij** | I, II, III, IV | 3600 |
+
+`Prestij IV` is the open-ended top division and continues upward from **3900+** without introducing artificial hidden caps.
+
+### Rating Rules
+
+The competitive system is Elo-inspired, but tuned for a tactical shooter where round impact matters and raw frag farming should not dominate the ladder.
+
+Core constants:
+
+- **Minimum rating:** `1000`
+- **Starting rating:** `1000`
+- **Division size:** `100`
+- **Placement window:** first `10` ranked matches
+
+The update model combines three layers:
+
+1. **Expected-result math**
+   - The system compares the player's rating against the opponent average rating.
+   - Beating stronger opposition is worth more.
+   - Losing to weaker opposition costs more.
+2. **K-factor scaling**
+   - Placement matches move faster so new players settle more quickly.
+   - High-rated players move more slowly to stabilize the top ladder.
+3. **Bounded performance adjustment**
+   - Kills, assists, deaths, round score, and MVP status can slightly influence rating movement.
+   - This modifier is intentionally capped to preserve team-result priority.
+
+### Fairness Philosophy
+
+The rank system is written around competitive integrity:
+
+- **Winning matters most.** Personal stats can improve or soften rating movement, but they do not replace match outcome.
+- **Losses stay losses.** Strong individual performance may reduce rating loss, but it does not flip a defeat into a gain.
+- **No promo series.** Promotion and demotion happen directly through rating thresholds, which removes unnecessary friction and hidden exceptions.
+- **No floor abuse below minimum.** Players cannot fall below the global minimum rating.
+- **Top-end ranks are more stable.** Rating swings naturally shrink at higher MMR bands.
+- **No hidden UI/backend mismatch.** Rank names are generated from rating thresholds, not hand-maintained strings.
+
+### Match Result Evaluation
+
+The ranked calculation consumes a `RankedMatchPerformance` snapshot. The current implementation evaluates:
+
+- player rating
+- opponent average rating
+- win / loss result
+- kills
+- deaths
+- assists
+- rounds won
+- rounds lost
+- MVP status
+- ranked matches played
+
+This produces a final bounded rating delta.
+
+| Match State | Rating Change Bounds |
+| :--- | :--- |
+| **Placement win** | `+10` to `+48` |
+| **Placement loss** | `-34` to `0` |
+| **Post-placement win** | `+10` to `+38` |
+| **Post-placement loss** | `-28` to `0` |
+
+This keeps the ladder readable for players and tunable for production balance passes.
+
+### Progression Persistence
+
+Ranked progression is stored in the Nakama player profile. The profile now tracks:
+
+- `elo`
+- `peakElo`
+- `rankedMatchesPlayed`
+- `rankedWins`
+- `rankedLosses`
+
+Before saving, profile data is sanitized so partial or stale records do not silently produce invalid ladder states. Missing fields are normalized back to safe defaults.
+
+### UI Integration
+
+The rank model is already integrated into the visible product flow:
+
+- [`Assets/Scripts/UI/MainMenuController.cs`](Assets/Scripts/UI/MainMenuController.cs)
+  - displays the loaded rank name together with `ELO` and currency
+- [`Assets/Scripts/UI/MatchResultsUI.cs`](Assets/Scripts/UI/MatchResultsUI.cs)
+  - replaces the old fixed `+25 / -15` placeholder with the real progression model
+  - shows rank transition text such as `Bronz III -> Gumus I`
+  - persists the updated result back into the cached Nakama profile
+
+### Current Scope
+
+At the current prototype stage, the ranked system is already coherent and trustworthy for vertical-slice use:
+
+- thresholds are canonical
+- rank names are deterministic
+- profile persistence is real
+- match-end feedback uses the actual rank logic
+- placement handling is live
+- top-rank stabilization is live
+
+Where the project can grow later is server-side enrichment of true opponent-average rating context and full dedicated-server validation before profile writeback. The current design was intentionally written so that upgrade path is straightforward.
+
+### Verification
+
+The rank system is covered by EditMode tests in [`Assets/Tests/EditMode/CompetitiveRankSystemTests.cs`](Assets/Tests/EditMode/CompetitiveRankSystemTests.cs). Current tests verify:
+
+- minimum rating maps to `Baslangic I`
+- four-division handling for `Baron` and late ladder tiers
+- stronger-opponent wins grant more rating than even-rated wins
+- rating never falls below the global system minimum
+
+---
+
 ## 📈 Dynamic Weapon Mastery System
 
 One of ProjectZ's heavily engineered features is its **Dynamic Weapon Mastery** loop. It is a live, in-match progression system where a player's mechanical performance directly impacts the physical handling metrics (Reload Speed, Fire Rate, Movement Speed, ADS Speed) of their held weapon. Damage outputs remain static globally to preserve absolute mechanical integrity.
