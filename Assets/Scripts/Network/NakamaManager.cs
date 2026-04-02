@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Nakama;
 using Newtonsoft.Json;
 using ProjectZ.GameMode;
+using ProjectZ.Monetization;
 using UnityEngine;
 
 namespace ProjectZ.Network
@@ -276,6 +277,51 @@ namespace ProjectZ.Network
             return result;
         }
 
+        public bool OwnsHero(string heroId)
+        {
+            EnsureCachedProfile();
+            return MonetizationService.OwnsHero(CachedProfile, heroId);
+        }
+
+        public bool CanAccessRankedByOwnership()
+        {
+            EnsureCachedProfile();
+            return MonetizationService.CanEnterRanked(CachedProfile);
+        }
+
+        public async Task<MonetizationPurchaseResult> TryUnlockHeroAsync(string heroId)
+        {
+            EnsureCachedProfile();
+
+            MonetizationPurchaseResult result = MonetizationService.TryUnlockHero(CachedProfile, heroId);
+            if (result.Succeeded)
+                await SavePlayerProfileAsync(CachedProfile);
+
+            return result;
+        }
+
+        public async Task<MonetizationPurchaseResult> TryPurchaseOfferAsync(
+            string offerId,
+            bool alphaEntitlementsEnabled = false,
+            bool season2Enabled = false,
+            bool eventContentEnabled = false)
+        {
+            EnsureCachedProfile();
+
+            MonetizationCatalogOffer offer = MonetizationCatalog.Instance.GetById(offerId);
+            MonetizationPurchaseResult result = MonetizationService.TryPurchaseOffer(
+                CachedProfile,
+                offer,
+                alphaEntitlementsEnabled,
+                season2Enabled,
+                eventContentEnabled);
+
+            if (result.Succeeded)
+                await SavePlayerProfileAsync(CachedProfile);
+
+            return result;
+        }
+
         private void EnsureCachedProfile()
         {
             if (CachedProfile == null)
@@ -330,6 +376,8 @@ namespace ProjectZ.Network
     {
         public string displayName;
         public int currency;
+        public int commandCredits;
+        public int zCore;
         public int elo;
         public int peakElo;
         public int rankedMatchesPlayed;
@@ -339,6 +387,9 @@ namespace ProjectZ.Network
         public string primaryWeaponId;
         public string secondaryWeaponId;
         public string meleeWeaponId;
+        public System.Collections.Generic.List<string> ownedHeroIds = new();
+        public System.Collections.Generic.List<string> ownedCosmeticIds = new();
+        public System.Collections.Generic.List<string> ownedOfferIds = new();
 
         // Mastery XP per weapon (weaponId -> xp)
         public System.Collections.Generic.Dictionary<string, int> weaponMastery = new();
@@ -348,7 +399,9 @@ namespace ProjectZ.Network
             PlayerProfileData profile = new PlayerProfileData
             {
                 displayName = username ?? "NewPlayer",
-                currency = 1000,
+                currency = MonetizationService.StartingCommandCredits,
+                commandCredits = MonetizationService.StartingCommandCredits,
+                zCore = MonetizationService.StartingZCore,
                 elo = CompetitiveRankSystem.StartingRating,
                 peakElo = CompetitiveRankSystem.StartingRating,
                 rankedMatchesPlayed = 0,
@@ -358,6 +411,9 @@ namespace ProjectZ.Network
                 primaryWeaponId = "vandal",
                 secondaryWeaponId = "pistol_classic",
                 meleeWeaponId = "knife_tactical",
+                ownedHeroIds = new System.Collections.Generic.List<string>(MonetizationService.GetStarterHeroIds()),
+                ownedCosmeticIds = new System.Collections.Generic.List<string>(),
+                ownedOfferIds = new System.Collections.Generic.List<string>(),
                 weaponMastery = new System.Collections.Generic.Dictionary<string, int>()
             };
 
@@ -369,6 +425,8 @@ namespace ProjectZ.Network
         {
             displayName = string.IsNullOrWhiteSpace(displayName) ? "NewPlayer" : displayName;
             currency = Mathf.Max(0, currency);
+            commandCredits = Mathf.Max(0, commandCredits);
+            zCore = Mathf.Max(0, zCore);
 
             if (elo < CompetitiveRankSystem.MinimumRating)
                 elo = CompetitiveRankSystem.StartingRating;
@@ -383,7 +441,12 @@ namespace ProjectZ.Network
             primaryWeaponId = string.IsNullOrWhiteSpace(primaryWeaponId) ? "vandal" : primaryWeaponId;
             secondaryWeaponId = string.IsNullOrWhiteSpace(secondaryWeaponId) ? "pistol_classic" : secondaryWeaponId;
             meleeWeaponId = string.IsNullOrWhiteSpace(meleeWeaponId) ? "knife_tactical" : meleeWeaponId;
+            ownedHeroIds ??= new System.Collections.Generic.List<string>();
+            ownedCosmeticIds ??= new System.Collections.Generic.List<string>();
+            ownedOfferIds ??= new System.Collections.Generic.List<string>();
             weaponMastery ??= new System.Collections.Generic.Dictionary<string, int>();
+
+            MonetizationService.NormalizeProfile(this);
         }
     }
 }

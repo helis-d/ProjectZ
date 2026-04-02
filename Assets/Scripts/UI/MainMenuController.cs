@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using ProjectZ.GameMode;
+using ProjectZ.Monetization;
 using ProjectZ.Network;
 
 namespace ProjectZ.UI
@@ -132,7 +133,16 @@ namespace ProjectZ.UI
             if (profile != null)
             {
                 CompetitiveRankInfo rank = CompetitiveRankSystem.GetRankInfo(profile.elo);
-                SetStatus($"Profil y\u00fcklendi: {profile.displayName} | Rank: {rank.DisplayName} | ELO: {profile.elo} | Para: {profile.currency}");
+                int ownedHeroes = MonetizationService.CountOwnedHeroes(profile);
+                bool rankedReady = MonetizationService.CanEnterRanked(profile);
+                string rankedStatus = rankedReady
+                    ? "Hazir"
+                    : $"{ownedHeroes}/{MonetizationService.RankedRequiredOwnedHeroes} hero";
+
+                SetStatus(
+                    $"Profil y\u00fcklendi: {profile.displayName} | Rank: {rank.DisplayName} | ELO: {profile.elo} | " +
+                    $"Komuta Kredisi: {profile.commandCredits} | Z-Core: {profile.zCore} | " +
+                    $"Hero: {ownedHeroes}/{MonetizationService.TotalHeroCount} | Ranked: {rankedStatus}");
             }
         }
 
