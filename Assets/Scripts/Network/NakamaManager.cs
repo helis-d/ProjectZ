@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Nakama;
 using Newtonsoft.Json;
+using ProjectZ.GameMode;
 using UnityEngine;
 
 namespace ProjectZ.Network
@@ -183,6 +184,8 @@ namespace ProjectZ.Network
                 foreach (var obj in result.Objects)
                 {
                     CachedProfile = JsonConvert.DeserializeObject<PlayerProfileData>(obj.Value);
+                    CachedProfile ??= PlayerProfileData.CreateDefault(_session.Username);
+                    CachedProfile.Sanitize();
                     Debug.Log($"[Nakama] Profile loaded: {CachedProfile.displayName}");
                     return CachedProfile;
                 }
@@ -205,6 +208,18 @@ namespace ProjectZ.Network
         /// </summary>
         public async Task SavePlayerProfileAsync(PlayerProfileData profile)
         {
+            if (profile == null)
+                return;
+
+            profile.Sanitize();
+            CachedProfile = profile;
+
+            if (!IsAuthenticated || _client == null || _session == null)
+            {
+                Debug.LogWarning("[Nakama] Save skipped because there is no authenticated session. Cached profile updated locally.");
+                return;
+            }
+
             try
             {
                 string json = JsonConvert.SerializeObject(profile);
@@ -220,14 +235,53 @@ namespace ProjectZ.Network
                         PermissionWrite = 1  // Owner can write
                     }
                 });
-
-                CachedProfile = profile;
                 Debug.Log("[Nakama] Profile saved successfully.");
             }
             catch (Exception e)
             {
                 Debug.LogError($"[Nakama] Failed to save profile: {e.Message}");
             }
+        }
+
+        public RankedProgressionResult PreviewRankedProgression(RankedMatchPerformance performance)
+        {
+            EnsureCachedProfile();
+
+            int previousRating = CachedProfile.elo;
+            int delta = CompetitiveRankSystem.CalculateRatingDelta(performance);
+            int newRating = CompetitiveRankSystem.ApplyRatingDelta(previousRating, delta);
+            return CompetitiveRankSystem.BuildProgressionResult(previousRating, newRating);
+        }
+
+        public async Task<RankedProgressionResult> ApplyRankedMatchResultAsync(RankedMatchPerformance performance)
+        {
+            EnsureCachedProfile();
+
+            int previousRating = CachedProfile.elo;
+            int delta = CompetitiveRankSystem.CalculateRatingDelta(performance);
+            int newRating = CompetitiveRankSystem.ApplyRatingDelta(previousRating, delta);
+
+            CachedProfile.elo = newRating;
+            CachedProfile.rankedMatchesPlayed++;
+            if (performance.Won)
+                CachedProfile.rankedWins++;
+            else
+                CachedProfile.rankedLosses++;
+
+            CachedProfile.peakElo = Mathf.Max(CachedProfile.peakElo, CachedProfile.elo);
+            CachedProfile.Sanitize();
+
+            RankedProgressionResult result = CompetitiveRankSystem.BuildProgressionResult(previousRating, newRating);
+            await SavePlayerProfileAsync(CachedProfile);
+            return result;
+        }
+
+        private void EnsureCachedProfile()
+        {
+            if (CachedProfile == null)
+                CachedProfile = PlayerProfileData.CreateDefault(_session != null ? _session.Username : "NewPlayer");
+
+            CachedProfile.Sanitize();
         }
 
         // ─── Matchmaking ──────────────────────────────────────────────────
@@ -277,6 +331,10 @@ namespace ProjectZ.Network
         public string displayName;
         public int currency;
         public int elo;
+        public int peakElo;
+        public int rankedMatchesPlayed;
+        public int rankedWins;
+        public int rankedLosses;
         public string selectedHero;
         public string primaryWeaponId;
         public string secondaryWeaponId;
@@ -287,17 +345,45 @@ namespace ProjectZ.Network
 
         public static PlayerProfileData CreateDefault(string username)
         {
-            return new PlayerProfileData
+            PlayerProfileData profile = new PlayerProfileData
             {
                 displayName = username ?? "NewPlayer",
                 currency = 1000,
-                elo = 1000,
+                elo = CompetitiveRankSystem.StartingRating,
+                peakElo = CompetitiveRankSystem.StartingRating,
+                rankedMatchesPlayed = 0,
+                rankedWins = 0,
+                rankedLosses = 0,
                 selectedHero = "volt",
                 primaryWeaponId = "vandal",
                 secondaryWeaponId = "pistol_classic",
                 meleeWeaponId = "knife_tactical",
                 weaponMastery = new System.Collections.Generic.Dictionary<string, int>()
             };
+
+            profile.Sanitize();
+            return profile;
+        }
+
+        public void Sanitize()
+        {
+            displayName = string.IsNullOrWhiteSpace(displayName) ? "NewPlayer" : displayName;
+            currency = Mathf.Max(0, currency);
+
+            if (elo < CompetitiveRankSystem.MinimumRating)
+                elo = CompetitiveRankSystem.StartingRating;
+
+            peakElo = Mathf.Max(peakElo, elo);
+            rankedMatchesPlayed = Mathf.Max(0, rankedMatchesPlayed);
+            rankedWins = Mathf.Max(0, rankedWins);
+            rankedLosses = Mathf.Max(0, rankedLosses);
+            rankedMatchesPlayed = Mathf.Max(rankedMatchesPlayed, rankedWins + rankedLosses);
+
+            selectedHero = string.IsNullOrWhiteSpace(selectedHero) ? "volt" : selectedHero;
+            primaryWeaponId = string.IsNullOrWhiteSpace(primaryWeaponId) ? "vandal" : primaryWeaponId;
+            secondaryWeaponId = string.IsNullOrWhiteSpace(secondaryWeaponId) ? "pistol_classic" : secondaryWeaponId;
+            meleeWeaponId = string.IsNullOrWhiteSpace(meleeWeaponId) ? "knife_tactical" : meleeWeaponId;
+            weaponMastery ??= new System.Collections.Generic.Dictionary<string, int>();
         }
     }
 }

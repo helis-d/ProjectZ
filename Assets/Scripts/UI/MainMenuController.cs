@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using ProjectZ.GameMode;
 using ProjectZ.Network;
 
 namespace ProjectZ.UI
@@ -130,7 +131,8 @@ namespace ProjectZ.UI
             var profile = await NakamaManager.Instance.LoadPlayerProfileAsync();
             if (profile != null)
             {
-                SetStatus($"Profil yüklendi: {profile.displayName} | ELO: {profile.elo} | Para: {profile.currency}");
+                CompetitiveRankInfo rank = CompetitiveRankSystem.GetRankInfo(profile.elo);
+                SetStatus($"Profil y\u00fcklendi: {profile.displayName} | Rank: {rank.DisplayName} | ELO: {profile.elo} | Para: {profile.currency}");
             }
         }
 

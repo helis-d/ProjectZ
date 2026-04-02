@@ -1,6 +1,8 @@
 using FishNet.Managing;
 using ProjectZ.Core;
 using ProjectZ.GameMode;
+using ProjectZ.Network;
+using ProjectZ.Player;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -42,6 +44,7 @@ namespace ProjectZ.UI
         private int _localDeaths;
         private int _localAssists;
         private int _localOwnerId = -1;
+        private bool _rankPersistenceQueued;
 
         private void Awake()
         {
@@ -74,6 +77,7 @@ namespace ProjectZ.UI
             _localKills = 0;
             _localDeaths = 0;
             _localAssists = 0;
+            _rankPersistenceQueued = false;
         }
 
         private void OnPlayerDeath(int victimId, int killerId)
@@ -140,14 +144,7 @@ namespace ProjectZ.UI
             if (_kdaText != null)
                 _kdaText.text = $"KDA: {kda:F1}";
 
-            int eloChange = isWinner ? 25 : -15;
-            if (_eloChangeText != null)
-            {
-                _eloChangeText.text = eloChange > 0 ? $"+{eloChange} ELO" : $"{eloChange} ELO";
-                _eloChangeText.color = eloChange > 0
-                    ? new Color(0.3f, 1f, 0.4f)
-                    : new Color(1f, 0.3f, 0.3f);
-            }
+            ApplyRankPresentation(isWinner);
 
             int xpGain = _localKills * 200 + _localAssists * 100 + (isWinner ? 500 : 200);
             if (_xpGainText != null)
@@ -201,6 +198,131 @@ namespace ProjectZ.UI
 
             team = teamManager.GetTeam(_localOwnerId);
             return team != Team.None;
+        }
+
+        private void ApplyRankPresentation(bool isWinner)
+        {
+            RankedGameMode rankedMode = FindFirstObjectByType<RankedGameMode>();
+            if (rankedMode == null)
+            {
+                int fallbackDelta = isWinner ? 25 : -15;
+                if (_eloChangeText != null)
+                {
+                    _eloChangeText.text = fallbackDelta > 0 ? $"+{fallbackDelta} ELO" : $"{fallbackDelta} ELO";
+                    _eloChangeText.color = fallbackDelta > 0
+                        ? new Color(0.3f, 1f, 0.4f)
+                        : new Color(1f, 0.3f, 0.3f);
+                }
+
+                return;
+            }
+
+            RankedMatchPerformance performance = BuildRankedPerformance(isWinner);
+            RankedProgressionResult preview = NakamaManager.Instance != null
+                ? NakamaManager.Instance.PreviewRankedProgression(performance)
+                : CompetitiveRankSystem.BuildProgressionResult(
+                    CompetitiveRankSystem.StartingRating,
+                    CompetitiveRankSystem.ApplyRatingDelta(
+                        CompetitiveRankSystem.StartingRating,
+                        CompetitiveRankSystem.CalculateRatingDelta(performance)));
+
+            if (_eloChangeText != null)
+            {
+                string deltaLabel = preview.Delta > 0 ? $"+{preview.Delta}" : preview.Delta.ToString();
+                string rankLabel = preview.PreviousRank.DisplayName == preview.NewRank.DisplayName
+                    ? preview.NewRank.DisplayName
+                    : $"{preview.PreviousRank.DisplayName} -> {preview.NewRank.DisplayName}";
+
+                _eloChangeText.text = $"{deltaLabel} ELO | {rankLabel}";
+                _eloChangeText.color = preview.Delta >= 0
+                    ? new Color(0.3f, 1f, 0.4f)
+                    : new Color(1f, 0.3f, 0.3f);
+            }
+
+            if (!_rankPersistenceQueued && NakamaManager.Instance != null)
+            {
+                _rankPersistenceQueued = true;
+                PersistRankedProgressionAsync(performance);
+            }
+        }
+
+        private RankedMatchPerformance BuildRankedPerformance(bool isWinner)
+        {
+            int currentRating = NakamaManager.Instance?.CachedProfile != null
+                ? NakamaManager.Instance.CachedProfile.elo
+                : CompetitiveRankSystem.StartingRating;
+
+            int rankedMatchesPlayed = NakamaManager.Instance?.CachedProfile != null
+                ? NakamaManager.Instance.CachedProfile.rankedMatchesPlayed
+                : 0;
+
+            GetMatchRoundBreakdown(isWinner, out int roundsWon, out int roundsLost);
+
+            return new RankedMatchPerformance(
+                currentRating,
+                currentRating,
+                isWinner,
+                _localKills,
+                _localDeaths,
+                _localAssists,
+                roundsWon,
+                roundsLost,
+                IsLocalMvp(),
+                rankedMatchesPlayed);
+        }
+
+        private void GetMatchRoundBreakdown(bool isWinner, out int roundsWon, out int roundsLost)
+        {
+            roundsWon = 13;
+            roundsLost = 11;
+
+            RankedGameMode rankedMode = FindFirstObjectByType<RankedGameMode>();
+            if (rankedMode != null)
+            {
+                int topScore = Mathf.Max(rankedMode.AttackerRoundWins, rankedMode.DefenderRoundWins);
+                int lowScore = Mathf.Min(rankedMode.AttackerRoundWins, rankedMode.DefenderRoundWins);
+                roundsWon = isWinner ? topScore : lowScore;
+                roundsLost = isWinner ? lowScore : topScore;
+                return;
+            }
+
+            FastFightMode fastFightMode = FindFirstObjectByType<FastFightMode>();
+            if (fastFightMode != null)
+            {
+                int topScore = Mathf.Max(fastFightMode.AttackerRoundWins, fastFightMode.DefenderRoundWins);
+                int lowScore = Mathf.Min(fastFightMode.AttackerRoundWins, fastFightMode.DefenderRoundWins);
+                roundsWon = isWinner ? topScore : lowScore;
+                roundsLost = isWinner ? lowScore : topScore;
+            }
+        }
+
+        private bool IsLocalMvp()
+        {
+            PlayerStats[] stats = FindObjectsByType<PlayerStats>(FindObjectsSortMode.None);
+            if (stats == null || stats.Length == 0)
+                return false;
+
+            int localScore = int.MinValue;
+            int bestScore = int.MinValue;
+
+            foreach (PlayerStats stat in stats)
+            {
+                if (stat == null)
+                    continue;
+
+                int score = (stat.Kills.Value * 3) + stat.Assists.Value - stat.Deaths.Value;
+                bestScore = Mathf.Max(bestScore, score);
+
+                if (stat.OwnerId == _localOwnerId)
+                    localScore = score;
+            }
+
+            return localScore != int.MinValue && localScore >= bestScore;
+        }
+
+        private async void PersistRankedProgressionAsync(RankedMatchPerformance performance)
+        {
+            await NakamaManager.Instance.ApplyRankedMatchResultAsync(performance);
         }
 
         private static string BuildScoreText()
