@@ -1,0 +1,19 @@
+name: Acquire Activation File
+
+on: workflow_dispatch
+
+jobs:
+  activation:
+    name: Request manual activation file 🔑
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request manual activation file
+        id: getManualALF
+        uses: game-ci/unity-request-activation-file@v4
+        with:
+          unityVersion: 6000.3.10f1
+      - name: Expose as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Unity_v6000.alf
+          path: ${{ steps.getManualALF.outputs.filePath }}
