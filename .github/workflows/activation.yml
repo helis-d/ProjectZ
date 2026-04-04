@@ -9,7 +9,7 @@ jobs:
     steps:
       - name: Request manual activation file
         id: getManualALF
-        uses: game-ci/unity-request-activation-file@v4
+        uses: game-ci/unity-request-activation-file@v3.1
         with:
           unityVersion: 6000.3.10f1
       - name: Expose as artifact
