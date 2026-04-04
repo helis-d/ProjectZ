@@ -69,12 +69,13 @@ jobs:
             Library-LinuxServer-
             Library-
 
-      - name: Unity Build — LinuxHeadlessServer
+      - name: Unity Build — Linux Dedicated Server
         uses: game-ci/unity-builder@v4
         with:
           projectPath: .
           unityVersion: 6000.3.10f1
-          targetPlatform: LinuxHeadlessServer
+          targetPlatform: StandaloneLinux64
+          customParameters: -standaloneBuildSubtarget Server
           buildName: ProjectZ_Server
           buildsPath: Builds/LinuxServer
 
