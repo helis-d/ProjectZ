@@ -354,35 +354,91 @@ namespace ProjectZ.Network
         }
 
         // ─── Matchmaking ──────────────────────────────────────────────────
+        // SBMM constants
+        private const int SBMM_RANKED_TOLERANCE   = 150;   // ±150 Elo for competitive
+        private const int SBMM_CASUAL_TOLERANCE    = 400;   // ±400 Elo for casual
+        private const int SBMM_MIN_ELO             = CompetitiveRankSystem.MinimumRating;
+        private const int SBMM_MAX_ELO             = 99999; // Open ceiling for Prestij+
+
         /// <summary>
-        /// Add this player to the matchmaking queue. 
-        /// Returns a matchmaker ticket that can be used to cancel the search.
+        /// Competitive ranked matchmaking — places the player into a queue with
+        /// tight Elo tolerance (±<see cref="SBMM_RANKED_TOLERANCE"/>).
+        /// The player's current Elo and rank band are sent as Nakama numeric
+        /// properties so the matchmaker can apply server-side filtering.
+        /// Returns null if competitive access requirements are not met.
         /// </summary>
-        public async Task<IMatchmakerTicket> FindMatchAsync(
+        public async Task<IMatchmakerTicket> FindRankedMatchAsync(int minPlayers = 10, int maxPlayers = 10)
+        {
+            EnsureCachedProfile();
+
+            if (!CanAccessRankedByOwnership())
+            {
+                Debug.LogWarning("[Nakama] Ranked matchmaking blocked: hero ownership requirements not met.");
+                return null;
+            }
+
+            int elo         = Mathf.Max(SBMM_MIN_ELO, CachedProfile.elo);
+            int eloFloor    = Mathf.Max(SBMM_MIN_ELO, elo - SBMM_RANKED_TOLERANCE);
+            int eloCeiling  = elo + SBMM_RANKED_TOLERANCE;
+
+            // Nakama query syntax: +properties.elo:>=floor +properties.elo:<=ceiling
+            string query = $"+properties.elo:>={eloFloor} +properties.elo:<={eloCeiling}";
+
+            var numericProperties = new System.Collections.Generic.Dictionary<string, double>
+            {
+                { "elo",            elo },
+                { "ranked_matches", CachedProfile.rankedMatchesPlayed }
+            };
+
+            var stringProperties = new System.Collections.Generic.Dictionary<string, string>
+            {
+                { "mode", "ranked" }
+            };
+
+            return await EnqueueMatchAsync(query, minPlayers, maxPlayers, numericProperties, stringProperties);
+        }
+
+        /// <summary>
+        /// Casual matchmaking with a wider Elo window (±<see cref="SBMM_CASUAL_TOLERANCE"/>).
+        /// No ownership gating — accessible to all authenticated players.
+        /// </summary>
+        public async Task<IMatchmakerTicket> FindCasualMatchAsync(int minPlayers = 2, int maxPlayers = 10)
+        {
+            EnsureCachedProfile();
+
+            int elo        = Mathf.Max(SBMM_MIN_ELO, CachedProfile.elo);
+            int eloFloor   = Mathf.Max(SBMM_MIN_ELO, elo - SBMM_CASUAL_TOLERANCE);
+            int eloCeiling = elo + SBMM_CASUAL_TOLERANCE;
+
+            string query = $"+properties.elo:>={eloFloor} +properties.elo:<={eloCeiling}";
+
+            var numericProperties = new System.Collections.Generic.Dictionary<string, double>
+            {
+                { "elo", elo }
+            };
+
+            var stringProperties = new System.Collections.Generic.Dictionary<string, string>
+            {
+                { "mode", "casual" }
+            };
+
+            return await EnqueueMatchAsync(query, minPlayers, maxPlayers, numericProperties, stringProperties);
+        }
+
+        /// <summary>
+        /// Legacy overload kept for backwards compatibility.
+        /// For new code prefer <see cref="FindRankedMatchAsync"/> or <see cref="FindCasualMatchAsync"/>.
+        /// </summary>
+        public Task<IMatchmakerTicket> FindMatchAsync(
             int minCount = 2,
             int maxCount = 10,
             string query = "*",
             bool requireCompetitiveAccess = false)
         {
-            try
-            {
-                PendingMatchToken = null;
+            if (requireCompetitiveAccess)
+                return FindRankedMatchAsync(minCount, maxCount);
 
-                if (requireCompetitiveAccess && !CanAccessRankedByOwnership())
-                {
-                    Debug.LogWarning("[Nakama] Matchmaking blocked: competitive access requirements are not met.");
-                    return null;
-                }
-
-                var ticket = await _socket.AddMatchmakerAsync(query, minCount, maxCount);
-                Debug.Log($"[Nakama] Matchmaking ticket: {ticket.Ticket}");
-                return ticket;
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"[Nakama] Matchmaking failed: {e.Message}");
-                return null;
-            }
+            return FindCasualMatchAsync(minCount, maxCount);
         }
 
         /// <summary>
@@ -390,6 +446,7 @@ namespace ProjectZ.Network
         /// </summary>
         public async Task CancelMatchAsync(IMatchmakerTicket ticket)
         {
+            if (ticket == null) return;
             try
             {
                 await _socket.RemoveMatchmakerAsync(ticket);
@@ -399,6 +456,94 @@ namespace ProjectZ.Network
             catch (Exception e)
             {
                 Debug.LogError($"[Nakama] Failed to cancel matchmaking: {e.Message}");
+            }
+        }
+
+        // ─── Internal Matchmaker Helper ───────────────────────────────────────
+        private async Task<IMatchmakerTicket> EnqueueMatchAsync(
+            string query,
+            int minCount,
+            int maxCount,
+            System.Collections.Generic.Dictionary<string, double> numericProps,
+            System.Collections.Generic.Dictionary<string, string> stringProps)
+        {
+            if (!IsAuthenticated || _socket == null)
+            {
+                Debug.LogError("[Nakama] Cannot matchmake: not authenticated.");
+                return null;
+            }
+
+            try
+            {
+                PendingMatchToken = null;
+
+                var ticket = await _socket.AddMatchmakerAsync(
+                    query,
+                    minCount,
+                    maxCount,
+                    stringProps,
+                    numericProps);
+
+                Debug.Log($"[Nakama] SBMM ticket issued — Query: {query} | Min: {minCount} Max: {maxCount} | Ticket: {ticket.Ticket}");
+                return ticket;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[Nakama] Matchmaking failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+        // ─── Match Telemetry ──────────────────────────────────────────
+        private const string TELEMETRY_COLLECTION = "match_telemetry";
+
+        /// <summary>
+        /// Persists a <see cref="MatchTelemetryData"/> record to the player's
+        /// Nakama Storage bucket after a match ends.
+        ///
+        /// The server-side Lua/TS hooks inside Nakama can aggregate these records
+        /// into leaderboards, balance dashboards, and LiveOps reports.
+        ///
+        /// Call from the game-mode layer (e.g. RankedGameMode.OnRoundEnd) once
+        /// all round results are available.
+        /// </summary>
+        public async Task SaveMatchTelemetryAsync(MatchTelemetryData telemetry)
+        {
+            if (telemetry == null || !IsAuthenticated)
+            {
+                Debug.LogWarning("[Nakama] Telemetry skipped: null data or unauthenticated.");
+                return;
+            }
+
+            // Stamp caller info before serialising.
+            telemetry.userId    = UserId;
+            telemetry.timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            telemetry.matchKey  = Guid.NewGuid().ToString("N")[..12]; // Short unique key
+
+            try
+            {
+                string json = JsonConvert.SerializeObject(telemetry, Formatting.None);
+
+                await _client.WriteStorageObjectsAsync(_session, new WriteStorageObject[]
+                {
+                    new WriteStorageObject
+                    {
+                        Collection     = TELEMETRY_COLLECTION,
+                        Key            = telemetry.matchKey,
+                        Value          = json,
+                        PermissionRead  = 2,   // Public read — dev dashboard can query any player
+                        PermissionWrite = 1    // Only owner can write (client-authoritative record)
+                    }
+                });
+
+                Debug.Log($"[Nakama] 📊 Telemetry saved — Match: {telemetry.matchKey} " +
+                          $"| Map: {telemetry.mapId} | Duration: {telemetry.matchDurationSeconds:F0}s " +
+                          $"| Winner: {telemetry.winningTeam}");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[Nakama] Failed to save telemetry: {e.Message}");
             }
         }
     }
@@ -484,5 +629,115 @@ namespace ProjectZ.Network
 
             MonetizationService.NormalizeProfile(this);
         }
+    }
+
+    // ─── Telemetry Model ───────────────────────────────────────────
+    /// <summary>
+    /// Structured match result record stored in Nakama Storage after each game.
+    /// Fields are deliberately flat (no nested objects) so they can be indexed
+    /// and queried by Nakama's server-runtime or piped to a BI dashboard
+    /// (BigQuery / Redshift) via a Nakama webhook.
+    ///
+    /// USAGE:
+    /// <code>
+    /// var t = new MatchTelemetryData
+    /// {
+    ///     mapId              = "map_fragment",
+    ///     gameMode           = "ranked",
+    ///     winningTeam        = "attacker",
+    ///     matchDurationSeconds = 312f,
+    ///     totalRoundsPlayed  = 13,
+    ///     attackerRoundsWon  = 7,
+    ///     defenderRoundsWon  = 6,
+    ///     kills              = 18,
+    ///     deaths             = 11,
+    ///     assists            = 4,
+    ///     mostUsedWeaponId   = "vandal",
+    ///     spherePlantsCount  = 5,
+    ///     heroId             = "volt",
+    ///     eloDelta           = +22
+    /// };
+    /// await NakamaManager.Instance.SaveMatchTelemetryAsync(t);
+    /// </code>
+    /// </summary>
+    [Serializable]
+    public class MatchTelemetryData
+    {
+        // ─ Identity (auto-stamped by SaveMatchTelemetryAsync) ────────────────
+        [Newtonsoft.Json.JsonProperty("user_id")]
+        public string userId;
+
+        [Newtonsoft.Json.JsonProperty("match_key")]
+        public string matchKey;
+
+        [Newtonsoft.Json.JsonProperty("timestamp_unix")]
+        public long timestamp;
+
+        // ─ Match Context ────────────────────────────────────────
+        [Newtonsoft.Json.JsonProperty("map_id")]
+        public string mapId;
+
+        [Newtonsoft.Json.JsonProperty("game_mode")]
+        public string gameMode;             // "ranked" | "casual" | "duel"
+
+        [Newtonsoft.Json.JsonProperty("winning_team")]
+        public string winningTeam;          // "attacker" | "defender"
+
+        [Newtonsoft.Json.JsonProperty("match_duration_sec")]
+        public float matchDurationSeconds;
+
+        [Newtonsoft.Json.JsonProperty("total_rounds")]
+        public int totalRoundsPlayed;
+
+        [Newtonsoft.Json.JsonProperty("attacker_rounds_won")]
+        public int attackerRoundsWon;
+
+        [Newtonsoft.Json.JsonProperty("defender_rounds_won")]
+        public int defenderRoundsWon;
+
+        // ─ Player Performance ───────────────────────────────────
+        [Newtonsoft.Json.JsonProperty("kills")]
+        public int kills;
+
+        [Newtonsoft.Json.JsonProperty("deaths")]
+        public int deaths;
+
+        [Newtonsoft.Json.JsonProperty("assists")]
+        public int assists;
+
+        [Newtonsoft.Json.JsonProperty("headshot_count")]
+        public int headshotCount;
+
+        [Newtonsoft.Json.JsonProperty("wallbang_count")]
+        public int wallbangCount;
+
+        [Newtonsoft.Json.JsonProperty("was_mvp")]
+        public bool wasMvp;
+
+        // ─ Weapon & Agent Metrics (Balance Data)──────────────────
+        [Newtonsoft.Json.JsonProperty("hero_id")]
+        public string heroId;
+
+        [Newtonsoft.Json.JsonProperty("most_used_weapon_id")]
+        public string mostUsedWeaponId;
+
+        [Newtonsoft.Json.JsonProperty("sphere_plants")]
+        public int spherePlantsCount;
+
+        [Newtonsoft.Json.JsonProperty("sphere_defuses")]
+        public int sphereDefusesCount;
+
+        [Newtonsoft.Json.JsonProperty("ultimate_activations")]
+        public int ultimateActivations;
+
+        // ─ Economy & Rating ─────────────────────────────────
+        [Newtonsoft.Json.JsonProperty("elo_before")]
+        public int eloBefore;
+
+        [Newtonsoft.Json.JsonProperty("elo_delta")]
+        public int eloDelta;
+
+        [Newtonsoft.Json.JsonProperty("peak_credits_this_match")]
+        public int peakCreditsThisMatch;
     }
 }
