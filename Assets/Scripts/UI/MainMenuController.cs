@@ -1,23 +1,17 @@
-using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
 using ProjectZ.GameMode;
 using ProjectZ.Monetization;
 using ProjectZ.Network;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace ProjectZ.UI
 {
-    /// <summary>
-    /// Ana Menü / Lobi kontrolcüsü. Nakama bağlantısını yönetir.
-    /// Butonlar: Bağlan → Maç Ara → İptal
-    /// 
-    /// KURULUM:
-    /// 1. Yeni bir sahne oluştur (Lobby)
-    /// 2. Canvas > Panel > Bu scriptlerin bağlı olduğu UI
-    /// 3. NakamaManager prefab'ını bu sahneye koy
-    /// </summary>
     public class MainMenuController : MonoBehaviour
     {
+        private const string GameplaySceneName = "SampleScene";
+
         [Header("UI References")]
         [SerializeField] private TextMeshProUGUI _statusText;
         [SerializeField] private TextMeshProUGUI _playerNameText;
@@ -31,10 +25,10 @@ namespace ProjectZ.UI
         [SerializeField] private GameObject _searchingPanel;
 
         private Nakama.IMatchmakerTicket _currentTicket;
+        private bool _profileReady;
 
         private void Start()
         {
-            // Buton eventleri
             if (_connectButton != null)
                 _connectButton.onClick.AddListener(OnConnectClicked);
             if (_findMatchButton != null)
@@ -42,43 +36,50 @@ namespace ProjectZ.UI
             if (_cancelMatchButton != null)
                 _cancelMatchButton.onClick.AddListener(OnCancelMatchClicked);
 
-            // Başlangıç durumu
             ShowPanel("connect");
-            SetStatus("Nakama sunucusuna bağlanmak için butona basın.");
+            SetLobbyActionsEnabled(false);
+            SetSearchingState(false);
+            SetStatus("Nakama sunucusuna baglanmak icin butona basin.");
         }
 
         private void OnEnable()
         {
-            if (NakamaManager.Instance != null)
-            {
-                NakamaManager.Instance.OnAuthenticationSuccess += OnAuthenticated;
-                NakamaManager.Instance.OnAuthenticationFailed += OnAuthFailed;
-                NakamaManager.Instance.OnMatchFound += OnMatchFound;
-            }
+            if (NakamaManager.Instance == null)
+                return;
+
+            NakamaManager.Instance.OnAuthenticationSuccess += OnAuthenticated;
+            NakamaManager.Instance.OnAuthenticationFailed += OnAuthFailed;
+            NakamaManager.Instance.OnMatchFound += OnMatchFound;
         }
 
         private void OnDisable()
         {
-            if (NakamaManager.Instance != null)
-            {
-                NakamaManager.Instance.OnAuthenticationSuccess -= OnAuthenticated;
-                NakamaManager.Instance.OnAuthenticationFailed -= OnAuthFailed;
-                NakamaManager.Instance.OnMatchFound -= OnMatchFound;
-            }
+            if (NakamaManager.Instance == null)
+                return;
+
+            NakamaManager.Instance.OnAuthenticationSuccess -= OnAuthenticated;
+            NakamaManager.Instance.OnAuthenticationFailed -= OnAuthFailed;
+            NakamaManager.Instance.OnMatchFound -= OnMatchFound;
         }
 
-        // ─── Buton İşleyicileri ───────────────────────────────────────────
         private async void OnConnectClicked()
         {
-            SetStatus("Bağlanılıyor...");
-            if (_connectButton != null) _connectButton.interactable = false;
+            if (NakamaManager.Instance == null)
+            {
+                SetStatus("NakamaManager bulunamadi.");
+                return;
+            }
+
+            SetStatus("Baglaniliyor...");
+            if (_connectButton != null)
+                _connectButton.interactable = false;
 
             bool success = await NakamaManager.Instance.AuthenticateWithDeviceAsync();
-
             if (!success)
             {
-                SetStatus("Bağlantı başarısız. Tekrar deneyin.");
-                if (_connectButton != null) _connectButton.interactable = true;
+                SetStatus("Baglanti basarisiz. Tekrar deneyin.");
+                if (_connectButton != null)
+                    _connectButton.interactable = true;
             }
         }
 
@@ -86,19 +87,38 @@ namespace ProjectZ.UI
         {
             if (NakamaManager.Instance == null || !NakamaManager.Instance.IsAuthenticated)
             {
-                SetStatus("Önce bağlanmalısınız!");
+                SetStatus("Once baglanmalisiniz.");
                 return;
             }
 
-            SetStatus("Maç aranıyor...");
+            if (!_profileReady)
+            {
+                SetStatus("Profil yuklenmeden ranked kuyruguna girilemez.");
+                return;
+            }
+
+            if (!NakamaManager.Instance.CanAccessRankedByOwnership())
+            {
+                int ownedHeroes = NakamaManager.Instance.CachedProfile != null
+                    ? MonetizationService.CountOwnedHeroes(NakamaManager.Instance.CachedProfile)
+                    : 0;
+
+                SetStatus(
+                    $"Ranked icin en az {MonetizationService.RankedRequiredOwnedHeroes} hero gerekli. " +
+                    $"Mevcut: {ownedHeroes}/{MonetizationService.RankedRequiredOwnedHeroes}.");
+                return;
+            }
+
+            SetStatus("Ranked mac araniyor...");
             ShowPanel("searching");
+            SetSearchingState(true);
 
-            _currentTicket = await NakamaManager.Instance.FindMatchAsync(2, 10, "*");
-
+            _currentTicket = await NakamaManager.Instance.FindMatchAsync(2, 10, "*", true);
             if (_currentTicket == null)
             {
-                SetStatus("Maç arama başarısız.");
+                SetSearchingState(false);
                 ShowPanel("lobby");
+                SetStatus("Mac arama basarisiz.");
             }
         }
 
@@ -110,71 +130,117 @@ namespace ProjectZ.UI
                 _currentTicket = null;
             }
 
-            SetStatus("Maç arama iptal edildi.");
+            SetSearchingState(false);
             ShowPanel("lobby");
+            SetStatus("Mac arama iptal edildi.");
         }
 
-        // ─── Event İşleyicileri ───────────────────────────────────────────
         private void OnAuthenticated()
         {
-            SetStatus($"Hoş geldin, {NakamaManager.Instance.Username}!");
+            _profileReady = false;
+            ShowPanel("lobby");
+            SetLobbyActionsEnabled(false);
+            SetSearchingState(false);
+
+            SetStatus($"Hos geldin, {NakamaManager.Instance.Username}!");
             if (_playerNameText != null)
                 _playerNameText.text = NakamaManager.Instance.Username;
 
-            ShowPanel("lobby");
-
-            // Profili yükle
             LoadProfileAsync();
         }
 
         private async void LoadProfileAsync()
         {
-            var profile = await NakamaManager.Instance.LoadPlayerProfileAsync();
-            if (profile != null)
-            {
-                CompetitiveRankInfo rank = CompetitiveRankSystem.GetRankInfo(profile.elo);
-                int ownedHeroes = MonetizationService.CountOwnedHeroes(profile);
-                bool rankedReady = MonetizationService.CanEnterRanked(profile);
-                string rankedStatus = rankedReady
-                    ? "Hazir"
-                    : $"{ownedHeroes}/{MonetizationService.RankedRequiredOwnedHeroes} hero";
+            if (NakamaManager.Instance == null)
+                return;
 
-                SetStatus(
-                    $"Profil y\u00fcklendi: {profile.displayName} | Rank: {rank.DisplayName} | ELO: {profile.elo} | " +
-                    $"Komuta Kredisi: {profile.commandCredits} | Z-Core: {profile.zCore} | " +
-                    $"Hero: {ownedHeroes}/{MonetizationService.TotalHeroCount} | Ranked: {rankedStatus}");
+            PlayerProfileData profile = await NakamaManager.Instance.LoadPlayerProfileAsync();
+            if (profile == null)
+            {
+                SetStatus("Profil yuklenemedi. Tekrar deneyin.");
+                SetLobbyActionsEnabled(false);
+                return;
             }
+
+            CompetitiveRankInfo rank = CompetitiveRankSystem.GetRankInfo(profile.elo);
+            int ownedHeroes = MonetizationService.CountOwnedHeroes(profile);
+            bool rankedReady = MonetizationService.CanEnterRanked(profile);
+            string rankedStatus = rankedReady
+                ? "Hazir"
+                : $"{ownedHeroes}/{MonetizationService.RankedRequiredOwnedHeroes} hero";
+
+            _profileReady = true;
+            SetLobbyActionsEnabled(rankedReady);
+
+            SetStatus(
+                $"Profil yuklendi: {profile.displayName} | Rank: {rank.DisplayName} | ELO: {profile.elo} | " +
+                $"Komuta Kredisi: {profile.commandCredits} | Z-Core: {profile.zCore} | " +
+                $"Hero: {ownedHeroes}/{MonetizationService.TotalHeroCount} | Ranked: {rankedStatus}");
         }
 
         private void OnAuthFailed(string error)
         {
-            SetStatus($"Bağlantı hatası: {error}");
-            if (_connectButton != null) _connectButton.interactable = true;
+            _profileReady = false;
+            SetLobbyActionsEnabled(false);
+            SetSearchingState(false);
             ShowPanel("connect");
+            SetStatus($"Baglanti hatasi: {error}");
+
+            if (_connectButton != null)
+                _connectButton.interactable = true;
         }
 
         private void OnMatchFound(Nakama.IMatchmakerMatched matched)
         {
-            SetStatus($"MAÇ BULUNDU! Token: {matched.Token.Substring(0, 8)}...");
             _currentTicket = null;
+            SetSearchingState(false);
 
-            // Burada oyun sahnesine geçiş yapılır
-            // UnityEngine.SceneManagement.SceneManager.LoadScene("GameScene");
-            Debug.Log($"[MainMenu] Matched ticket token: {matched.Token}");
+            string tokenPreview = string.IsNullOrWhiteSpace(matched?.Token)
+                ? "n/a"
+                : matched.Token.Substring(0, Mathf.Min(8, matched.Token.Length));
+
+            SetStatus($"Mac bulundu. Token: {tokenPreview}...");
+
+            if (SceneManager.GetActiveScene().name == GameplaySceneName)
+                return;
+
+            if (!Application.CanStreamedLevelBeLoaded(GameplaySceneName))
+            {
+                SetStatus($"Mac bulundu ancak '{GameplaySceneName}' build settings icinde degil.");
+                return;
+            }
+
+            SceneManager.LoadScene(GameplaySceneName);
         }
 
-        // ─── Yardımcılar ─────────────────────────────────────────────────
         private void SetStatus(string message)
         {
-            if (_statusText != null) _statusText.text = message;
+            if (_statusText != null)
+                _statusText.text = message;
+
             Debug.Log($"[MainMenu] {message}");
         }
 
         private void ShowPanel(string panel)
         {
-            if (_connectPanel != null)   _connectPanel.SetActive(panel == "connect");
-            if (_lobbyPanel != null)     _lobbyPanel.SetActive(panel == "lobby");
-            if (_searchingPanel != null)  _searchingPanel.SetActive(panel == "searching");
+            if (_connectPanel != null)
+                _connectPanel.SetActive(panel == "connect");
+            if (_lobbyPanel != null)
+                _lobbyPanel.SetActive(panel == "lobby");
+            if (_searchingPanel != null)
+                _searchingPanel.SetActive(panel == "searching");
+        }
+
+        private void SetLobbyActionsEnabled(bool canFindMatch)
+        {
+            if (_findMatchButton != null)
+                _findMatchButton.interactable = _profileReady && canFindMatch;
+        }
+
+        private void SetSearchingState(bool isSearching)
+        {
+            if (_cancelMatchButton != null)
+                _cancelMatchButton.interactable = isSearching;
         }
     }
 }

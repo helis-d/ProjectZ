@@ -30,6 +30,7 @@ namespace ProjectZ.Player
 
         public readonly SyncVar<float> UltimateCharge = new(0f);
         public readonly SyncVar<bool> _isPistolRound = new();
+        public readonly SyncVar<string> SelectedHeroId = new(string.Empty);
 
         private UltimateAbility _activeUltimate;
         private PlayerInputHandler _input;
@@ -43,6 +44,12 @@ namespace ProjectZ.Player
         private void Awake()
         {
             _input = GetComponent<PlayerInputHandler>();
+            SelectedHeroId.OnChange += HandleSelectedHeroIdChanged;
+        }
+
+        private void OnDestroy()
+        {
+            SelectedHeroId.OnChange -= HandleSelectedHeroIdChanged;
         }
 
         public override void OnStartServer()
@@ -54,6 +61,14 @@ namespace ProjectZ.Player
 
             GameEvents.OnPlayerDeath += HandlePlayerDeath;
             GameEvents.OnPlayerAssist += HandlePlayerAssist;
+        }
+
+        public override void OnStartClient()
+        {
+            base.OnStartClient();
+
+            if (!string.IsNullOrWhiteSpace(SelectedHeroId.Value))
+                ApplyResolvedHeroData(SelectedHeroId.Value);
         }
 
         public override void OnStopServer()
@@ -85,6 +100,7 @@ namespace ProjectZ.Player
                 return;
 
             _selectedHero = hero;
+            SelectedHeroId.Value = string.IsNullOrWhiteSpace(hero.heroId) ? string.Empty : hero.heroId.Trim().ToLowerInvariant();
             UltimateCharge.Value = 0f;
             _baseUltimateId = hero.ultimateId;
             _hasStolenUltimate = false;
@@ -208,6 +224,19 @@ namespace ProjectZ.Player
                 UltimateAbilityId.GrappleStrike => GetComponent<GrappleStrike>(),
                 _ => null
             };
+        }
+
+        private void HandleSelectedHeroIdChanged(string previousHeroId, string nextHeroId, bool asServer)
+        {
+            if (!string.IsNullOrWhiteSpace(nextHeroId))
+                ApplyResolvedHeroData(nextHeroId);
+        }
+
+        private void ApplyResolvedHeroData(string heroId)
+        {
+            HeroData resolvedHero = HeroCatalog.Instance.GetById(heroId);
+            if (resolvedHero != null)
+                _selectedHero = resolvedHero;
         }
 
         private void HandlePlayerDeath(int victimId, int killerId)

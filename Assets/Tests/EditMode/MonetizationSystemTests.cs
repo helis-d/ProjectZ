@@ -62,6 +62,23 @@ namespace ProjectZ.Tests
             Assert.IsTrue(ListContains((IEnumerable)GetFieldValue(profile, "ownedCosmeticIds"), "weaponskin_vandal_firstlight"));
         }
 
+        [Test]
+        public void NormalizeProfile_DoesNotGrantUnownedSelectedHero()
+        {
+            Type profileType = GetGameplayType("ProjectZ.Network.PlayerProfileData");
+            Type monetizationServiceType = GetGameplayType("ProjectZ.Monetization.MonetizationService");
+
+            object profile = InvokeStatic(profileType, "CreateDefault", "LegacyPilot");
+            SetFieldValue(profile, "selectedHero", "lagrange");
+
+            InvokeStatic(monetizationServiceType, "NormalizeProfile", profile);
+
+            string selectedHero = (string)GetFieldValue(profile, "selectedHero");
+            Assert.IsFalse(ListContains((IEnumerable)GetFieldValue(profile, "ownedHeroIds"), "lagrange"));
+            Assert.AreNotEqual("lagrange", selectedHero);
+            Assert.IsTrue(ListContains((IEnumerable)GetFieldValue(profile, "ownedHeroIds"), selectedHero));
+        }
+
         private static Type GetGameplayType(string fullName)
         {
             Assembly gameplayAssembly = AppDomain.CurrentDomain

@@ -46,6 +46,8 @@ namespace ProjectZ.Network
         public IClient Client => _client;
         /// <summary>The active session.</summary>
         public ISession Session => _session;
+        /// <summary>The latest matchmaker token received from Nakama.</summary>
+        public string PendingMatchToken { get; private set; }
 
         // ─── Events ───────────────────────────────────────────────────────
         public event Action OnAuthenticationSuccess;
@@ -141,11 +143,13 @@ namespace ProjectZ.Network
             _socket.Closed += (sender) =>
             {
                 Debug.Log("[Nakama] Socket disconnected.");
+                PendingMatchToken = null;
                 OnDisconnected?.Invoke();
             };
 
             _socket.ReceivedMatchmakerMatched += matched =>
             {
+                PendingMatchToken = matched.Token;
                 Debug.Log($"[Nakama] Match found! Token: {matched.Token}");
                 OnMatchFound?.Invoke(matched);
             };
@@ -300,6 +304,25 @@ namespace ProjectZ.Network
             return result;
         }
 
+        public async Task<bool> SetSelectedHeroAsync(string heroId)
+        {
+            EnsureCachedProfile();
+
+            if (!MonetizationService.CanSelectHero(CachedProfile, heroId))
+                return false;
+
+            CachedProfile.selectedHero = heroId;
+            CachedProfile.Sanitize();
+            await SavePlayerProfileAsync(CachedProfile);
+            return true;
+        }
+
+        public string GetSelectedHeroId()
+        {
+            EnsureCachedProfile();
+            return CachedProfile.selectedHero;
+        }
+
         public async Task<MonetizationPurchaseResult> TryPurchaseOfferAsync(
             string offerId,
             bool alphaEntitlementsEnabled = false,
@@ -335,10 +358,22 @@ namespace ProjectZ.Network
         /// Add this player to the matchmaking queue. 
         /// Returns a matchmaker ticket that can be used to cancel the search.
         /// </summary>
-        public async Task<IMatchmakerTicket> FindMatchAsync(int minCount = 2, int maxCount = 10, string query = "*")
+        public async Task<IMatchmakerTicket> FindMatchAsync(
+            int minCount = 2,
+            int maxCount = 10,
+            string query = "*",
+            bool requireCompetitiveAccess = false)
         {
             try
             {
+                PendingMatchToken = null;
+
+                if (requireCompetitiveAccess && !CanAccessRankedByOwnership())
+                {
+                    Debug.LogWarning("[Nakama] Matchmaking blocked: competitive access requirements are not met.");
+                    return null;
+                }
+
                 var ticket = await _socket.AddMatchmakerAsync(query, minCount, maxCount);
                 Debug.Log($"[Nakama] Matchmaking ticket: {ticket.Ticket}");
                 return ticket;
@@ -358,6 +393,7 @@ namespace ProjectZ.Network
             try
             {
                 await _socket.RemoveMatchmakerAsync(ticket);
+                PendingMatchToken = null;
                 Debug.Log("[Nakama] Matchmaking cancelled.");
             }
             catch (Exception e)

@@ -1,3 +1,4 @@
+using FishNet.Managing;
 using FishNet.Object;
 using ProjectZ.Economy;
 using ProjectZ.GameMode;
@@ -16,7 +17,9 @@ namespace ProjectZ.Core
     public class SampleSceneBootstrap : MonoBehaviour
     {
         private const string TargetSceneName = "SampleScene";
+
         private bool _uiBound;
+        private bool _serverRuntimeReady;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void CreateBootstrap()
@@ -39,18 +42,33 @@ namespace ProjectZ.Core
                 return;
             }
 
-            EnsureGameplaySystems();
-            EnsureSphereSystems();
             EnsureBuyZones();
+            EnsureSphereSites();
             EnsureHud();
             EnsureCrosshair();
         }
 
         private void Update()
         {
-            if (_uiBound)
+            if (!_serverRuntimeReady)
+                EnsureServerRuntime();
+
+            if (!_uiBound)
+                TryBindLocalUi();
+        }
+
+        private void EnsureServerRuntime()
+        {
+            if (!TryGetActiveServerManager(out NetworkManager networkManager))
                 return;
 
+            EnsureGameplaySystems(networkManager);
+            EnsureSphereManager(networkManager);
+            _serverRuntimeReady = true;
+        }
+
+        private void TryBindLocalUi()
+        {
             PlayerHealth[] players = FindObjectsByType<PlayerHealth>(FindObjectsSortMode.None);
             foreach (PlayerHealth player in players)
             {
@@ -67,11 +85,22 @@ namespace ProjectZ.Core
             }
         }
 
-        private static void EnsureGameplaySystems()
+        private static bool TryGetActiveServerManager(out NetworkManager networkManager)
+        {
+            networkManager = FindFirstObjectByType<NetworkManager>();
+            return networkManager != null && networkManager.IsServerStarted;
+        }
+
+        private static void EnsureGameplaySystems(NetworkManager networkManager)
         {
             GameObject systems = GameObject.Find("Gameplay Systems");
+            bool createdByBootstrap = false;
             if (systems == null)
+            {
                 systems = new GameObject("Gameplay Systems");
+                MarkRuntimeNetworkObject(systems);
+                createdByBootstrap = true;
+            }
 
             EnsureComponent<NetworkObject>(systems);
             RankedGameMode rankedMode = EnsureComponent<RankedGameMode>(systems);
@@ -79,35 +108,51 @@ namespace ProjectZ.Core
             EnsureComponent<RoundManager>(systems);
             EnsureComponent<EconomyManager>(systems);
 
-            EnsureSpawnPoints(teamManager, systems.transform);
+            if (createdByBootstrap || GameObject.Find("Bootstrap Spawn Points") != null)
+                EnsureSpawnPoints(teamManager, systems.transform);
 
             if (rankedMode != null)
                 rankedMode.enabled = true;
+
+            SpawnRuntimeNetworkObject(networkManager, systems);
         }
 
-        private static void EnsureSphereSystems()
+        private static void EnsureSphereManager(NetworkManager networkManager)
         {
             GameObject sphereManagerObject = GameObject.Find("Sphere Manager");
             if (sphereManagerObject == null)
+            {
                 sphereManagerObject = new GameObject("Sphere Manager");
+                MarkRuntimeNetworkObject(sphereManagerObject);
+            }
 
             EnsureComponent<NetworkObject>(sphereManagerObject);
             SphereManager sphereManager = EnsureComponent<SphereManager>(sphereManagerObject);
+
+            if (sphereManagerObject.transform.position == Vector3.zero)
+                sphereManagerObject.transform.position = new Vector3(0f, 0.5f, 0f);
+
+            sphereManager.enabled = true;
+            SpawnRuntimeNetworkObject(networkManager, sphereManagerObject);
+        }
+
+        private static void EnsureSphereSites()
+        {
+            if (FindFirstObjectByType<SphereSite>() != null)
+                return;
 
             GameObject sitesRoot = GameObject.Find("Sphere Sites");
             if (sitesRoot == null)
                 sitesRoot = new GameObject("Sphere Sites");
 
             EnsureSite(sitesRoot.transform, "Site A", "A", new Vector3(0f, 0.5f, 0f), 2.5f);
-
-            if (sphereManagerObject.transform.position == Vector3.zero)
-                sphereManagerObject.transform.position = new Vector3(0f, 0.5f, 0f);
-
-            sphereManager.enabled = true;
         }
 
         private static void EnsureBuyZones()
         {
+            if (FindFirstObjectByType<BuyZone>() != null)
+                return;
+
             GameObject buyRoot = GameObject.Find("Buy Zones");
             if (buyRoot == null)
                 buyRoot = new GameObject("Buy Zones");
@@ -357,6 +402,28 @@ namespace ProjectZ.Core
             return new Vector2(0.5f, 0.5f);
         }
 
+        private static void MarkRuntimeNetworkObject(GameObject target)
+        {
+            EnsureComponent<BootstrapRuntimeMarker>(target);
+        }
+
+        private static void SpawnRuntimeNetworkObject(NetworkManager networkManager, GameObject target)
+        {
+            if (networkManager == null || target == null)
+                return;
+
+            if (target.GetComponent<BootstrapRuntimeMarker>() == null)
+                return;
+
+            if (!target.TryGetComponent(out NetworkObject networkObject))
+                return;
+
+            if (networkObject.IsSpawned)
+                return;
+
+            networkManager.ServerManager.Spawn(target);
+        }
+
         private static T EnsureComponent<T>(GameObject target) where T : Component
         {
             T component = target.GetComponent<T>();
@@ -364,5 +431,10 @@ namespace ProjectZ.Core
                 component = target.AddComponent<T>();
             return component;
         }
+    }
+
+    [DisallowMultipleComponent]
+    internal sealed class BootstrapRuntimeMarker : MonoBehaviour
+    {
     }
 }

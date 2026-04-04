@@ -49,7 +49,7 @@ namespace ProjectZ.Network
 
         private void Update()
         {
-            // OYUN TESTI ICIN KISAYOL -> P TUSUNA BASILINCA SUNUCUYU BASLATIR
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (Keyboard.current != null && Keyboard.current.pKey.wasPressedThisFrame)
             {
                 if (!IsServer && !IsClient)
@@ -57,6 +57,7 @@ namespace ProjectZ.Network
                     StartHost();
                 }
             }
+#endif
         }
 
         // ─── Public API ───────────────────────────────────────────────────

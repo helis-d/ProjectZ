@@ -156,17 +156,10 @@ namespace ProjectZ.Monetization
             }
 
             string normalizedSelectedHero = NormalizeId(profile.selectedHero);
-            if (IsKnownHeroId(normalizedSelectedHero))
-            {
-                if (!profile.ownedHeroIds.Contains(normalizedSelectedHero))
-                    profile.ownedHeroIds.Add(normalizedSelectedHero);
-
+            if (IsKnownHeroId(normalizedSelectedHero) && profile.ownedHeroIds.Contains(normalizedSelectedHero))
                 profile.selectedHero = normalizedSelectedHero;
-            }
             else
-            {
-                profile.selectedHero = _starterHeroIds[0];
-            }
+                profile.selectedHero = ResolveDefaultSelectedHeroId(profile);
         }
 
         public static bool OwnsHero(PlayerProfileData profile, string heroId)
@@ -190,6 +183,11 @@ namespace ProjectZ.Monetization
         public static bool CanEnterRanked(PlayerProfileData profile)
         {
             return CountOwnedHeroes(profile) >= RankedRequiredOwnedHeroes;
+        }
+
+        public static bool CanSelectHero(PlayerProfileData profile, string heroId)
+        {
+            return profile != null && IsKnownHeroId(heroId) && OwnsHero(profile, heroId);
         }
 
         public static MonetizationPurchaseResult TryUnlockHero(PlayerProfileData profile, string heroId)
@@ -383,6 +381,24 @@ namespace ProjectZ.Monetization
                 default:
                     return false;
             }
+        }
+
+        private static string ResolveDefaultSelectedHeroId(PlayerProfileData profile)
+        {
+            if (profile != null && profile.ownedHeroIds != null)
+            {
+                for (int i = 0; i < _starterHeroIds.Length; i++)
+                {
+                    string starterHero = _starterHeroIds[i];
+                    if (profile.ownedHeroIds.Contains(starterHero))
+                        return starterHero;
+                }
+
+                if (profile.ownedHeroIds.Count > 0)
+                    return profile.ownedHeroIds[0];
+            }
+
+            return _starterHeroIds[0];
         }
 
         private static void NormalizeOwnedIds(List<string> ids)

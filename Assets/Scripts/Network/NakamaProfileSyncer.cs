@@ -1,4 +1,5 @@
 using FishNet.Object;
+using ProjectZ.Hero;
 using ProjectZ.Player;
 using UnityEngine;
 
@@ -13,12 +14,15 @@ namespace ProjectZ.Network
     public class NakamaProfileSyncer : NetworkBehaviour
     {
         [SerializeField] private PlayerInventory _inventory;
-        // Optionally add hero/stat references here later if needed
+        [SerializeField] private PlayerHeroController _heroController;
 
         private void Awake()
         {
             if (_inventory == null)
                 _inventory = GetComponent<PlayerInventory>();
+
+            if (_heroController == null)
+                _heroController = GetComponent<PlayerHeroController>();
         }
 
         public override void OnStartClient()
@@ -32,9 +36,9 @@ namespace ProjectZ.Network
             if (NakamaManager.Instance != null && NakamaManager.Instance.CachedProfile != null)
             {
                 var p = NakamaManager.Instance.CachedProfile;
-                Debug.Log($"[ProfileSyncer] Syncing Nakama profile to server: {p.displayName} | {p.primaryWeaponId} / {p.secondaryWeaponId} / {p.meleeWeaponId}");
-                
-                CmdSyncProfile(p.displayName, p.primaryWeaponId, p.secondaryWeaponId, p.meleeWeaponId);
+                Debug.Log($"[ProfileSyncer] Syncing Nakama profile to server: {p.displayName} | Hero={p.selectedHero} | {p.primaryWeaponId} / {p.secondaryWeaponId} / {p.meleeWeaponId}");
+                 
+                CmdSyncProfile(p.displayName, p.primaryWeaponId, p.secondaryWeaponId, p.meleeWeaponId, p.selectedHero);
             }
             else
             {
@@ -43,7 +47,7 @@ namespace ProjectZ.Network
         }
 
         [ServerRpc]
-        private void CmdSyncProfile(string displayName, string primaryId, string secondaryId, string meleeId)
+        private void CmdSyncProfile(string displayName, string primaryId, string secondaryId, string meleeId, string selectedHeroId)
         {
             // Update inventory
             if (_inventory != null)
@@ -57,6 +61,13 @@ namespace ProjectZ.Network
 
                 var meleeData = Weapon.WeaponCatalog.Instance?.GetById(meleeId);
                 if (meleeData != null) _inventory.PickUpWeapon(meleeData);
+            }
+
+            if (_heroController != null)
+            {
+                HeroData heroData = HeroCatalog.Instance.GetById(selectedHeroId);
+                if (heroData != null)
+                    _heroController.EquipHero(heroData);
             }
 
             // Sync the name (if we have a PlayerName component, set it here)
