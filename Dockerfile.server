@@ -10,22 +10,21 @@ RUN apt-get update && apt-get install -y \
 
 # Add a non-root user for security
 RUN useradd -ms /bin/bash unityuser
-USER unityuser
 
 # Set working directory
 WORKDIR /home/unityuser/app
 
-# Copy the Linux Headless Server build into the container image
-# Note: The BuildScript.cs puts it in Builds/LinuxServer/
+# Copy entire Linux Server build output (Unity may nest inside a subdirectory)
 COPY --chown=unityuser:unityuser ./Builds/LinuxServer/ /home/unityuser/app/
+
+USER unityuser
 
 # Expose standard game server port (FishNet default is usually UDP 7770)
 EXPOSE 7770/udp
 
-# Make the executable executable
-RUN chmod +x /home/unityuser/app/ProjectZ_Server.x86_64
+# Make all .x86_64 binaries executable
+RUN find /home/unityuser/app -name "*.x86_64" -exec chmod +x {} \;
 
-# Start the headless server
-# Additional arguments can be passed at runtime using override commands
-ENTRYPOINT ["/home/unityuser/app/ProjectZ_Server.x86_64"]
+# Start the headless server — find the binary at runtime
+ENTRYPOINT ["sh", "-c", "exec $(find /home/unityuser/app -name '*.x86_64' | head -1) \"$@\"", "--"]
 CMD ["-batchmode", "-nographics"]
