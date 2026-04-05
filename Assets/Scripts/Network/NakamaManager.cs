@@ -493,7 +493,6 @@ namespace ProjectZ.Network
                 return null;
             }
         }
-    }
 
         // ─── Match Telemetry ──────────────────────────────────────────
         private const string TELEMETRY_COLLECTION = "match_telemetry";
