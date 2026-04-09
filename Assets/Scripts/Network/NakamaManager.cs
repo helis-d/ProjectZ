@@ -54,6 +54,7 @@ namespace ProjectZ.Network
         public event Action<string> OnAuthenticationFailed;
         public event Action OnDisconnected;
         public event Action<IMatchmakerMatched> OnMatchFound;
+        public event Action<PlayerProfileData> OnProfileLoaded;
 
         // ─── Player Data Cache ────────────────────────────────────────────
         /// <summary>Cached player profile loaded from Nakama storage.</summary>
@@ -79,7 +80,7 @@ namespace ProjectZ.Network
 
         private void OnDestroy()
         {
-            DisconnectAsync();
+            _ = DisconnectAsync();
         }
 
         // ─── Authentication ───────────────────────────────────────────────
@@ -138,34 +139,21 @@ namespace ProjectZ.Network
         // ─── Socket ───────────────────────────────────────────────────────
         private async Task ConnectSocketAsync()
         {
+            if (_socket != null)
+                await ResetSocketAsync();
+
             _socket = _client.NewSocket();
-
-            _socket.Closed += (sender) =>
-            {
-                Debug.Log("[Nakama] Socket disconnected.");
-                PendingMatchToken = null;
-                OnDisconnected?.Invoke();
-            };
-
-            _socket.ReceivedMatchmakerMatched += matched =>
-            {
-                PendingMatchToken = matched.Token;
-                Debug.Log($"[Nakama] Match found! Token: {matched.Token}");
-                OnMatchFound?.Invoke(matched);
-            };
+            _socket.Closed += HandleSocketClosed;
+            _socket.ReceivedMatchmakerMatched += HandleMatchmakerMatched;
 
             await _socket.ConnectAsync(_session, true);
             Debug.Log("[Nakama] Socket connected.");
         }
 
         /// <summary>Gracefully disconnect the socket.</summary>
-        public async void DisconnectAsync()
+        public async Task DisconnectAsync()
         {
-            if (_socket != null)
-            {
-                await _socket.CloseAsync();
-                _socket = null;
-            }
+            await ResetSocketAsync();
         }
 
         // ─── Storage: Player Profile ──────────────────────────────────────
@@ -191,6 +179,7 @@ namespace ProjectZ.Network
                     CachedProfile = JsonConvert.DeserializeObject<PlayerProfileData>(obj.Value);
                     CachedProfile ??= PlayerProfileData.CreateDefault(_session.Username);
                     CachedProfile.Sanitize();
+                    OnProfileLoaded?.Invoke(CachedProfile);
                     Debug.Log($"[Nakama] Profile loaded: {CachedProfile.displayName}");
                     return CachedProfile;
                 }
@@ -199,6 +188,7 @@ namespace ProjectZ.Network
                 Debug.Log("[Nakama] No profile found, creating default...");
                 CachedProfile = PlayerProfileData.CreateDefault(_session.Username);
                 await SavePlayerProfileAsync(CachedProfile);
+                OnProfileLoaded?.Invoke(CachedProfile);
                 return CachedProfile;
             }
             catch (Exception e)
@@ -353,6 +343,16 @@ namespace ProjectZ.Network
             CachedProfile.Sanitize();
         }
 
+        public bool HasPendingMatchToken()
+        {
+            return !string.IsNullOrWhiteSpace(PendingMatchToken);
+        }
+
+        public void ClearPendingMatchToken()
+        {
+            PendingMatchToken = null;
+        }
+
         // ─── Matchmaking ──────────────────────────────────────────────────
         // SBMM constants
         private const int SBMM_RANKED_TOLERANCE   = 150;   // ±150 Elo for competitive
@@ -436,7 +436,7 @@ namespace ProjectZ.Network
             bool requireCompetitiveAccess = false)
         {
             if (requireCompetitiveAccess)
-                return FindRankedMatchAsync(minCount, maxCount);
+                return FindRankedMatchAsync();
 
             return FindCasualMatchAsync(minCount, maxCount);
         }
@@ -492,6 +492,43 @@ namespace ProjectZ.Network
                 Debug.LogError($"[Nakama] Matchmaking failed: {e.Message}");
                 return null;
             }
+        }
+
+        private async Task ResetSocketAsync()
+        {
+            if (_socket == null)
+                return;
+
+            ISocket socket = _socket;
+            _socket = null;
+
+            socket.Closed -= HandleSocketClosed;
+            socket.ReceivedMatchmakerMatched -= HandleMatchmakerMatched;
+
+            try
+            {
+                await socket.CloseAsync();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Nakama] Socket close raised while resetting: {e.Message}");
+            }
+
+            PendingMatchToken = null;
+        }
+
+        private void HandleSocketClosed(string reason)
+        {
+            Debug.Log($"[Nakama] Socket disconnected. Reason: {reason}");
+            PendingMatchToken = null;
+            OnDisconnected?.Invoke();
+        }
+
+        private void HandleMatchmakerMatched(IMatchmakerMatched matched)
+        {
+            PendingMatchToken = matched.Token;
+            Debug.Log($"[Nakama] Match found! Token: {matched.Token}");
+            OnMatchFound?.Invoke(matched);
         }
 
         // ─── Match Telemetry ──────────────────────────────────────────

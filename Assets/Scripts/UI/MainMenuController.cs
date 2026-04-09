@@ -113,7 +113,7 @@ namespace ProjectZ.UI
             ShowPanel("searching");
             SetSearchingState(true);
 
-            _currentTicket = await NakamaManager.Instance.FindMatchAsync(2, 10, "*", true);
+            _currentTicket = await NakamaManager.Instance.FindRankedMatchAsync();
             if (_currentTicket == null)
             {
                 SetSearchingState(false);
@@ -199,14 +199,21 @@ namespace ProjectZ.UI
                 ? "n/a"
                 : matched.Token.Substring(0, Mathf.Min(8, matched.Token.Length));
 
-            SetStatus($"Mac bulundu. Token: {tokenPreview}...");
-
-            if (SceneManager.GetActiveScene().name == GameplaySceneName)
-                return;
+            SetStatus($"Mac bulundu. Token: {tokenPreview}... Oyun oturumu baslatiliyor.");
 
             if (!Application.CanStreamedLevelBeLoaded(GameplaySceneName))
             {
                 SetStatus($"Mac bulundu ancak '{GameplaySceneName}' build settings icinde degil.");
+                return;
+            }
+
+            if (SceneManager.GetActiveScene().name == GameplaySceneName)
+            {
+                if (GameNetworkManager.Instance != null)
+                    GameNetworkManager.Instance.TryBeginPendingMatchSession();
+                else
+                    SetStatus("Mac bulundu ancak GameNetworkManager aktif degil.");
+
                 return;
             }
 

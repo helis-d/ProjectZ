@@ -16,6 +16,8 @@ namespace ProjectZ.Network
         [SerializeField] private PlayerInventory _inventory;
         [SerializeField] private PlayerHeroController _heroController;
 
+        private bool _hasSyncedProfile;
+
         private void Awake()
         {
             if (_inventory == null)
@@ -25,6 +27,12 @@ namespace ProjectZ.Network
                 _heroController = GetComponent<PlayerHeroController>();
         }
 
+        private void OnDestroy()
+        {
+            if (NakamaManager.Instance != null)
+                NakamaManager.Instance.OnProfileLoaded -= HandleProfileLoaded;
+        }
+
         public override void OnStartClient()
         {
             base.OnStartClient();
@@ -32,18 +40,7 @@ namespace ProjectZ.Network
             // Only the owner syncs their own profile to the server
             if (!IsOwner) return;
 
-            // Check if NakamaManager and a cached profile exist
-            if (NakamaManager.Instance != null && NakamaManager.Instance.CachedProfile != null)
-            {
-                var p = NakamaManager.Instance.CachedProfile;
-                Debug.Log($"[ProfileSyncer] Syncing Nakama profile to server: {p.displayName} | Hero={p.selectedHero} | {p.primaryWeaponId} / {p.secondaryWeaponId} / {p.meleeWeaponId}");
-                 
-                CmdSyncProfile(p.displayName, p.primaryWeaponId, p.secondaryWeaponId, p.meleeWeaponId, p.selectedHero);
-            }
-            else
-            {
-                Debug.LogWarning("[ProfileSyncer] Nakama profile not found natively. Defaults will be used.");
-            }
+            TrySyncProfileOrSubscribe();
         }
 
         [ServerRpc]
@@ -72,6 +69,51 @@ namespace ProjectZ.Network
 
             // Sync the name (if we have a PlayerName component, set it here)
             Debug.Log($"[Server] Profile synced for client {OwnerId}: Name={displayName}");
+        }
+
+        private void TrySyncProfileOrSubscribe()
+        {
+            NakamaManager manager = NakamaManager.Instance;
+            if (manager == null)
+            {
+                Debug.LogWarning("[ProfileSyncer] NakamaManager not available yet. Waiting for profile load.");
+                return;
+            }
+
+            manager.OnProfileLoaded -= HandleProfileLoaded;
+            manager.OnProfileLoaded += HandleProfileLoaded;
+
+            if (manager.CachedProfile != null)
+                SyncProfile(manager.CachedProfile);
+            else
+                Debug.Log("[ProfileSyncer] Cached profile is not ready yet. Waiting for load callback.");
+        }
+
+        private void HandleProfileLoaded(PlayerProfileData profile)
+        {
+            SyncProfile(profile);
+        }
+
+        private void SyncProfile(PlayerProfileData profile)
+        {
+            if (!IsOwner || _hasSyncedProfile || profile == null)
+                return;
+
+            _hasSyncedProfile = true;
+
+            if (NakamaManager.Instance != null)
+                NakamaManager.Instance.OnProfileLoaded -= HandleProfileLoaded;
+
+            Debug.Log(
+                $"[ProfileSyncer] Syncing Nakama profile to server: {profile.displayName} | Hero={profile.selectedHero} | " +
+                $"{profile.primaryWeaponId} / {profile.secondaryWeaponId} / {profile.meleeWeaponId}");
+
+            CmdSyncProfile(
+                profile.displayName,
+                profile.primaryWeaponId,
+                profile.secondaryWeaponId,
+                profile.meleeWeaponId,
+                profile.selectedHero);
         }
     }
 }
