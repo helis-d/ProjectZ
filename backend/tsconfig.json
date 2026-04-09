@@ -1,12 +1,16 @@
 {
   "compilerOptions": {
     "target": "es5",
-    "module": "commonjs",
     "outFile": "./build/index.js",
     "strict": true,
-    "esModuleInterop": true,
+    "noImplicitReturns": true,
+    "removeComments": true,
+    "typeRoots": ["./node_modules"],
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*"]
+  "files": [
+    "./node_modules/nakama-runtime/index.d.ts",
+    "./src/main.ts"
+  ]
 }

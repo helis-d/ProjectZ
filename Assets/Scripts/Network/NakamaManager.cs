@@ -62,6 +62,9 @@ namespace ProjectZ.Network
 
         private const string STORAGE_COLLECTION = "player_data";
         private const string STORAGE_KEY_PROFILE = "profile";
+        private const string RPC_SELECT_HERO = "projectz_select_hero";
+        private const string RPC_UNLOCK_HERO = "projectz_unlock_hero";
+        private const string RPC_PURCHASE_OFFER = "projectz_purchase_offer";
 
         // ─── Unity Lifecycle ──────────────────────────────────────────────
         private void Awake()
@@ -286,25 +289,34 @@ namespace ProjectZ.Network
         public async Task<MonetizationPurchaseResult> TryUnlockHeroAsync(string heroId)
         {
             EnsureCachedProfile();
+            BackendPurchaseRpcResponse response = await CallBackendRpcAsync<BackendPurchaseRpcResponse>(
+                RPC_UNLOCK_HERO,
+                new BackendHeroRequest { heroId = heroId });
 
-            MonetizationPurchaseResult result = MonetizationService.TryUnlockHero(CachedProfile, heroId);
-            if (result.Succeeded)
-                await SavePlayerProfileAsync(CachedProfile);
+            if (response?.profile != null)
+                ApplyBackendProfile(response.profile);
 
-            return result;
+            if (response?.purchase != null)
+                return response.purchase.ToPurchaseResult();
+
+            return new MonetizationPurchaseResult(
+                MonetizationPurchaseStatus.InvalidProfile,
+                $"hero_unlock_{heroId}",
+                heroId,
+                response != null ? response.message : "Backend hero unlock istegi basarisiz oldu.");
         }
 
         public async Task<bool> SetSelectedHeroAsync(string heroId)
         {
             EnsureCachedProfile();
+            BackendProfileRpcResponse response = await CallBackendRpcAsync<BackendProfileRpcResponse>(
+                RPC_SELECT_HERO,
+                new BackendHeroRequest { heroId = heroId });
 
-            if (!MonetizationService.CanSelectHero(CachedProfile, heroId))
-                return false;
+            if (response?.profile != null)
+                ApplyBackendProfile(response.profile);
 
-            CachedProfile.selectedHero = heroId;
-            CachedProfile.Sanitize();
-            await SavePlayerProfileAsync(CachedProfile);
-            return true;
+            return response != null && response.succeeded;
         }
 
         public string GetSelectedHeroId()
@@ -320,19 +332,21 @@ namespace ProjectZ.Network
             bool eventContentEnabled = false)
         {
             EnsureCachedProfile();
+            BackendPurchaseRpcResponse response = await CallBackendRpcAsync<BackendPurchaseRpcResponse>(
+                RPC_PURCHASE_OFFER,
+                new BackendOfferRequest { offerId = offerId });
 
-            MonetizationCatalogOffer offer = MonetizationCatalog.Instance.GetById(offerId);
-            MonetizationPurchaseResult result = MonetizationService.TryPurchaseOffer(
-                CachedProfile,
-                offer,
-                alphaEntitlementsEnabled,
-                season2Enabled,
-                eventContentEnabled);
+            if (response?.profile != null)
+                ApplyBackendProfile(response.profile);
 
-            if (result.Succeeded)
-                await SavePlayerProfileAsync(CachedProfile);
+            if (response?.purchase != null)
+                return response.purchase.ToPurchaseResult();
 
-            return result;
+            return new MonetizationPurchaseResult(
+                MonetizationPurchaseStatus.InvalidOffer,
+                offerId,
+                offerId,
+                response != null ? response.message : "Backend satin alim istegi basarisiz oldu.");
         }
 
         private void EnsureCachedProfile()
@@ -341,6 +355,52 @@ namespace ProjectZ.Network
                 CachedProfile = PlayerProfileData.CreateDefault(_session != null ? _session.Username : "NewPlayer");
 
             CachedProfile.Sanitize();
+        }
+
+        private async Task<TResponse> CallBackendRpcAsync<TResponse>(string rpcId, object payload)
+            where TResponse : class
+        {
+            if (!IsAuthenticated || _client == null || _session == null)
+            {
+                Debug.LogWarning($"[Nakama] RPC skipped because there is no authenticated session: {rpcId}");
+                return null;
+            }
+
+            try
+            {
+                string payloadJson = payload != null ? JsonConvert.SerializeObject(payload) : null;
+                IApiRpc rpcResponse = string.IsNullOrWhiteSpace(payloadJson)
+                    ? await _client.RpcAsync(_session, rpcId)
+                    : await _client.RpcAsync(_session, rpcId, payloadJson);
+
+                if (rpcResponse == null || string.IsNullOrWhiteSpace(rpcResponse.Payload))
+                {
+                    Debug.LogWarning($"[Nakama] RPC returned an empty payload: {rpcId}");
+                    return null;
+                }
+
+                return JsonConvert.DeserializeObject<TResponse>(rpcResponse.Payload);
+            }
+            catch (ApiResponseException e)
+            {
+                Debug.LogError($"[Nakama] RPC {rpcId} failed: {e.Message}");
+                return null;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[Nakama] RPC {rpcId} failed unexpectedly: {e.Message}");
+                return null;
+            }
+        }
+
+        private void ApplyBackendProfile(PlayerProfileData profile)
+        {
+            if (profile == null)
+                return;
+
+            profile.Sanitize();
+            CachedProfile = profile;
+            OnProfileLoaded?.Invoke(CachedProfile);
         }
 
         public bool HasPendingMatchToken()
@@ -580,6 +640,55 @@ namespace ProjectZ.Network
             catch (Exception e)
             {
                 Debug.LogError($"[Nakama] Failed to save telemetry: {e.Message}");
+            }
+        }
+
+        [Serializable]
+        private sealed class BackendHeroRequest
+        {
+            public string heroId;
+        }
+
+        [Serializable]
+        private sealed class BackendOfferRequest
+        {
+            public string offerId;
+        }
+
+        [Serializable]
+        private class BackendProfileRpcResponse
+        {
+            public bool succeeded;
+            public string errorCode;
+            public string message;
+            public PlayerProfileData profile;
+        }
+
+        [Serializable]
+        private sealed class BackendPurchaseRpcResponse : BackendProfileRpcResponse
+        {
+            public BackendPurchasePayload purchase;
+        }
+
+        [Serializable]
+        private sealed class BackendPurchasePayload
+        {
+            public MonetizationPurchaseStatus status;
+            public string offerId;
+            public string contentId;
+            public string message;
+            public MonetizationCurrencyType currencyType;
+            public int amountSpent;
+
+            public MonetizationPurchaseResult ToPurchaseResult()
+            {
+                return new MonetizationPurchaseResult(
+                    status,
+                    offerId,
+                    contentId,
+                    message,
+                    currencyType,
+                    amountSpent);
             }
         }
     }

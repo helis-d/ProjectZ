@@ -4,12 +4,13 @@
   "description": "Nakama TypeScript Backend Module for ProjectZ",
   "main": "build/index.js",
   "scripts": {
-    "build": "npx tsc"
+    "build": "npx tsc -p tsconfig.json",
+    "type-check": "npx tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "nakama-runtime": "https://github.com/heroiclabs/nakama-common/releases/download/v1.31.0/nakama-runtime.tgz"
+    "nakama-runtime": "github:heroiclabs/nakama-common"
   }
 }
