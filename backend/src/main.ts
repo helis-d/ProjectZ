@@ -2,6 +2,7 @@ const STORAGE_COLLECTION = "player_data";
 const STORAGE_KEY_PROFILE = "profile";
 
 const RPC_BACKEND_HEALTH = "projectz_backend_health";
+const RPC_GET_PROFILE_STATE = "projectz_get_profile_state";
 const RPC_SELECT_HERO = "projectz_select_hero";
 const RPC_UNLOCK_HERO = "projectz_unlock_hero";
 const RPC_PURCHASE_OFFER = "projectz_purchase_offer";
@@ -11,6 +12,8 @@ const RPC_SUBMIT_MATCH_TELEMETRY = "projectz_submit_match_telemetry";
 const MATCH_HANDLER_ID = "custom_lobby";
 const RANKED_LEADERBOARD_ID = "ranked_rating";
 const TELEMETRY_COLLECTION = "match_telemetry";
+const WALLET_KEY_COMMAND_CREDITS = "command_credits";
+const WALLET_KEY_ZCORE = "z_core";
 
 const STARTING_COMMAND_CREDITS = 1000;
 const STARTING_ZCORE = 0;
@@ -116,6 +119,11 @@ interface RankedResultPayload {
     wasMvp: boolean;
 }
 
+interface WalletState {
+    commandCredits: number;
+    zCore: number;
+}
+
 let InitModule: nkruntime.InitModule = function(ctx, logger, nk, initializer) {
     logger.info("Initializing ProjectZ authoritative backend module.");
     ensureRankedLeaderboard(logger, nk);
@@ -130,6 +138,7 @@ let InitModule: nkruntime.InitModule = function(ctx, logger, nk, initializer) {
     });
     initializer.registerMatchmakerMatched(MatchmakerMatched);
     initializer.registerRpc(RPC_BACKEND_HEALTH, RpcBackendHealth);
+    initializer.registerRpc(RPC_GET_PROFILE_STATE, RpcGetProfileState);
     initializer.registerRpc(RPC_SELECT_HERO, RpcSelectHero);
     initializer.registerRpc(RPC_UNLOCK_HERO, RpcUnlockHero);
     initializer.registerRpc(RPC_PURCHASE_OFFER, RpcPurchaseOffer);
@@ -188,7 +197,13 @@ function MatchTerminate(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nk
 }
 
 function RpcBackendHealth(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama): string {
-    return JSON.stringify({ succeeded: true, message: "ProjectZ backend online.", backendVersion: "phase2", rankedLeaderboardId: RANKED_LEADERBOARD_ID });
+    return JSON.stringify({ succeeded: true, message: "ProjectZ backend online.", backendVersion: "phase3", rankedLeaderboardId: RANKED_LEADERBOARD_ID });
+}
+
+function RpcGetProfileState(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama): string {
+    return runProfileRpc(ctx, logger, nk, function(profile) {
+        return response(true, null, "Profile state loaded.", profile, null, false);
+    });
 }
 
 function RpcSelectHero(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
@@ -209,7 +224,7 @@ function RpcSelectHero(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkr
 function RpcUnlockHero(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
     return runProfileRpc(ctx, logger, nk, function(profile) {
         var request = parsePayload(payload);
-        var purchase = tryUnlockHero(profile, normalizeId(request.heroId));
+        var purchase = tryUnlockHero(ctx.userId!, nk, profile, normalizeId(request.heroId));
         return response(purchase.status === PURCHASE_STATUS_SUCCESS, purchaseStatusToCode(purchase.status), purchase.message, profile, purchase, purchase.status === PURCHASE_STATUS_SUCCESS);
     });
 }
@@ -217,7 +232,7 @@ function RpcUnlockHero(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkr
 function RpcPurchaseOffer(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
     return runProfileRpc(ctx, logger, nk, function(profile) {
         var request = parsePayload(payload);
-        var purchase = tryPurchaseOffer(ctx, profile, getOfferById(normalizeId(request.offerId)));
+        var purchase = tryPurchaseOffer(ctx, ctx.userId!, nk, profile, getOfferById(normalizeId(request.offerId)));
         return response(purchase.status === PURCHASE_STATUS_SUCCESS, purchaseStatusToCode(purchase.status), purchase.message, profile, purchase, purchase.status === PURCHASE_STATUS_SUCCESS);
     });
 }
@@ -336,9 +351,12 @@ function runProfileRpc(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkr
 function loadOrCreateProfile(ctx: nkruntime.Context, nk: nkruntime.Nakama) {
     var objects = nk.storageRead([{ collection: STORAGE_COLLECTION, key: STORAGE_KEY_PROFILE, userId: ctx.userId! }]);
     if (objects && objects.length > 0) {
-        return { profile: sanitizeProfile(castProfile(objects[0].value)), version: objects[0].version };
+        var existingProfile = sanitizeProfile(castProfile(objects[0].value));
+        applyWalletStateToProfile(existingProfile, ensureWalletState(ctx.userId!, existingProfile, nk));
+        return { profile: existingProfile, version: objects[0].version };
     }
     var profile = createDefaultProfile(ctx.username || "NewPlayer");
+    applyWalletStateToProfile(profile, ensureWalletState(ctx.userId!, profile, nk));
     writeProfile(ctx.userId!, profile, null, nk);
     return { profile: profile, version: null };
 }
@@ -427,22 +445,27 @@ function sanitizeProfile(profile: PlayerProfileData): PlayerProfileData {
     return profile;
 }
 
-function tryUnlockHero(profile: PlayerProfileData, heroId: string) {
+function tryUnlockHero(userId: string, nk: nkruntime.Nakama, profile: PlayerProfileData, heroId: string) {
     if (!isKnownHero(heroId)) {
         return purchase(PURCHASE_STATUS_UNKNOWN_HERO, "hero_unlock_" + heroId, heroId, "Unknown hero unlock request.", CURRENCY_NONE, 0);
     }
     if (ownsHero(profile, heroId)) {
         return purchase(PURCHASE_STATUS_ALREADY_OWNED, "hero_unlock_" + heroId, heroId, "Hero already owned.", CURRENCY_NONE, 0);
     }
-    if (!spendCurrency(profile, CURRENCY_COMMAND_CREDITS, DEFAULT_HERO_UNLOCK_PRICE)) {
+    var walletSpend = spendWalletCurrency(userId, nk, CURRENCY_COMMAND_CREDITS, DEFAULT_HERO_UNLOCK_PRICE, {
+        reason: "hero_unlock",
+        heroId: heroId
+    });
+    if (!walletSpend.succeeded) {
         return purchase(PURCHASE_STATUS_INSUFFICIENT_FUNDS, "hero_unlock_" + heroId, heroId, "Not enough Command Credits.", CURRENCY_COMMAND_CREDITS, 0);
     }
+    applyWalletStateToProfile(profile, walletSpend.wallet);
     profile.ownedHeroIds.push(heroId);
     profile.ownedHeroIds = normalizeIds(profile.ownedHeroIds);
     return purchase(PURCHASE_STATUS_SUCCESS, "hero_unlock_" + heroId, heroId, getHeroDisplayName(heroId) + " unlocked permanently.", CURRENCY_COMMAND_CREDITS, DEFAULT_HERO_UNLOCK_PRICE);
 }
 
-function tryPurchaseOffer(ctx: nkruntime.Context, profile: PlayerProfileData, offer: CatalogOffer | null) {
+function tryPurchaseOffer(ctx: nkruntime.Context, userId: string, nk: nkruntime.Nakama, profile: PlayerProfileData, offer: CatalogOffer | null) {
     if (!offer) {
         return purchase(PURCHASE_STATUS_INVALID_OFFER, null, null, "Offer not found.", CURRENCY_NONE, 0);
     }
@@ -450,14 +473,20 @@ function tryPurchaseOffer(ctx: nkruntime.Context, profile: PlayerProfileData, of
         return purchase(PURCHASE_STATUS_OFFER_NOT_ACTIVE, offer.offerId, offer.contentId, "Offer is not currently active.", CURRENCY_NONE, 0);
     }
     if (offer.offerType === OFFER_TYPE_HERO_UNLOCK) {
-        return tryUnlockHero(profile, normalizeId(offer.contentId));
+        return tryUnlockHero(userId, nk, profile, normalizeId(offer.contentId));
     }
     if (ownsOffer(profile, offer)) {
         return purchase(PURCHASE_STATUS_ALREADY_OWNED, offer.offerId, offer.contentId, "Offer already owned.", CURRENCY_NONE, 0);
     }
-    if (!spendCurrency(profile, offer.priceCurrency, offer.price)) {
+    var walletSpend = spendWalletCurrency(userId, nk, offer.priceCurrency, offer.price, {
+        reason: "offer_purchase",
+        offerId: offer.offerId,
+        contentId: offer.contentId
+    });
+    if (!walletSpend.succeeded) {
         return purchase(PURCHASE_STATUS_INSUFFICIENT_FUNDS, offer.offerId, offer.contentId, "Insufficient funds.", offer.priceCurrency, 0);
     }
+    applyWalletStateToProfile(profile, walletSpend.wallet);
     grantOffer(profile, offer);
     return purchase(PURCHASE_STATUS_SUCCESS, offer.offerId, offer.contentId, offer.displayName + " purchased successfully.", offer.priceCurrency, offer.price);
 }
@@ -516,19 +545,25 @@ function isOfferActive(ctx: nkruntime.Context, offer: CatalogOffer): boolean {
     return false;
 }
 
-function spendCurrency(profile: PlayerProfileData, currencyType: number, amount: number): boolean {
-    if (currencyType === CURRENCY_COMMAND_CREDITS) {
-        if (profile.commandCredits < amount) return false;
-        profile.commandCredits -= amount;
-        profile.currency = profile.commandCredits;
-        return true;
+function spendWalletCurrency(userId: string, nk: nkruntime.Nakama, currencyType: number, amount: number, metadata?: {[key: string]: any}) {
+    if (amount <= 0) {
+        return { succeeded: true, wallet: readWalletState(userId, nk) };
     }
-    if (currencyType === CURRENCY_ZCORE) {
-        if (profile.zCore < amount) return false;
-        profile.zCore -= amount;
-        return true;
+
+    var walletKey = getWalletKey(currencyType);
+    if (!walletKey) {
+        return { succeeded: false, wallet: readWalletState(userId, nk) };
     }
-    return false;
+
+    var changeset: {[key: string]: number} = {};
+    changeset[walletKey] = -Math.abs(amount);
+
+    try {
+        var walletResult = nk.walletUpdate(userId, changeset, metadata || {}, true);
+        return { succeeded: true, wallet: walletStateFromRaw(walletResult.updated) };
+    } catch (error) {
+        return { succeeded: false, wallet: readWalletState(userId, nk), error: errorToString(error) };
+    }
 }
 
 function response(succeeded: boolean, errorCode: string | null, message: string, profile: PlayerProfileData | null, purchaseResult?: any, persist?: boolean) {
@@ -583,6 +618,66 @@ function ensureRankedLeaderboard(logger: nkruntime.Logger, nk: nkruntime.Nakama)
 function resolveDefaultHero(profile: PlayerProfileData): string {
     for (var i = 0; i < STARTER_HERO_IDS.length; i++) if (containsString(profile.ownedHeroIds, STARTER_HERO_IDS[i])) return STARTER_HERO_IDS[i];
     return profile.ownedHeroIds.length > 0 ? profile.ownedHeroIds[0] : STARTER_HERO_IDS[0];
+}
+
+function ensureWalletState(userId: string, profile: PlayerProfileData, nk: nkruntime.Nakama): WalletState {
+    var account = nk.accountGetId(userId);
+    var rawWallet = account && account.wallet ? account.wallet : {};
+
+    var hasCommandCredits = hasWalletKey(rawWallet, WALLET_KEY_COMMAND_CREDITS);
+    var hasZCore = hasWalletKey(rawWallet, WALLET_KEY_ZCORE);
+    if (hasCommandCredits && hasZCore) {
+        return walletStateFromRaw(rawWallet);
+    }
+
+    var bootstrapChanges: {[key: string]: number} = {};
+    if (!hasCommandCredits) {
+        var desiredCommandCredits = clampMin(readNumber(profile.commandCredits, STARTING_COMMAND_CREDITS), 0);
+        if (desiredCommandCredits !== 0) {
+            bootstrapChanges[WALLET_KEY_COMMAND_CREDITS] = desiredCommandCredits;
+        }
+    }
+    if (!hasZCore) {
+        var desiredZCore = clampMin(readNumber(profile.zCore, STARTING_ZCORE), 0);
+        if (desiredZCore !== 0) {
+            bootstrapChanges[WALLET_KEY_ZCORE] = desiredZCore;
+        }
+    }
+
+    if (Object.keys(bootstrapChanges).length === 0) {
+        return walletStateFromRaw(rawWallet);
+    }
+
+    var walletResult = nk.walletUpdate(userId, bootstrapChanges, { reason: "wallet_bootstrap" }, false);
+    return walletStateFromRaw(walletResult.updated);
+}
+
+function readWalletState(userId: string, nk: nkruntime.Nakama): WalletState {
+    var account = nk.accountGetId(userId);
+    return walletStateFromRaw(account && account.wallet ? account.wallet : {});
+}
+
+function applyWalletStateToProfile(profile: PlayerProfileData, wallet: WalletState): void {
+    profile.commandCredits = wallet.commandCredits;
+    profile.currency = wallet.commandCredits;
+    profile.zCore = wallet.zCore;
+}
+
+function walletStateFromRaw(wallet: {[key: string]: number}): WalletState {
+    return {
+        commandCredits: clampMin(readNumber(wallet ? wallet[WALLET_KEY_COMMAND_CREDITS] : 0, 0), 0),
+        zCore: clampMin(readNumber(wallet ? wallet[WALLET_KEY_ZCORE] : 0, 0), 0)
+    };
+}
+
+function hasWalletKey(wallet: {[key: string]: number}, key: string): boolean {
+    return !!wallet && typeof wallet[key] === "number";
+}
+
+function getWalletKey(currencyType: number): string | null {
+    if (currencyType === CURRENCY_COMMAND_CREDITS) return WALLET_KEY_COMMAND_CREDITS;
+    if (currencyType === CURRENCY_ZCORE) return WALLET_KEY_ZCORE;
+    return null;
 }
 
 function buildRankedResultPayload(raw: any, profile: PlayerProfileData): RankedResultPayload {

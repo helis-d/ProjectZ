@@ -62,6 +62,7 @@ namespace ProjectZ.Network
 
         private const string STORAGE_COLLECTION = "player_data";
         private const string STORAGE_KEY_PROFILE = "profile";
+        private const string RPC_GET_PROFILE_STATE = "projectz_get_profile_state";
         private const string RPC_SELECT_HERO = "projectz_select_hero";
         private const string RPC_UNLOCK_HERO = "projectz_unlock_hero";
         private const string RPC_PURCHASE_OFFER = "projectz_purchase_offer";
@@ -167,6 +168,14 @@ namespace ProjectZ.Network
         /// </summary>
         public async Task<PlayerProfileData> LoadPlayerProfileAsync()
         {
+            BackendProfileRpcResponse authoritativeResponse = await CallBackendRpcAsync<BackendProfileRpcResponse>(RPC_GET_PROFILE_STATE, null);
+            if (authoritativeResponse?.profile != null)
+            {
+                ApplyBackendProfile(authoritativeResponse.profile);
+                Debug.Log($"[Nakama] Authoritative profile loaded: {CachedProfile.displayName}");
+                return CachedProfile;
+            }
+
             try
             {
                 var result = await _client.ReadStorageObjectsAsync(_session, new IApiReadStorageObjectId[]
