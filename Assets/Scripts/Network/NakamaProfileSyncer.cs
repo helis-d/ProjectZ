@@ -1,4 +1,5 @@
 using FishNet.Object;
+using Newtonsoft.Json;
 using ProjectZ.Hero;
 using ProjectZ.Player;
 using UnityEngine;
@@ -17,6 +18,8 @@ namespace ProjectZ.Network
         [SerializeField] private PlayerHeroController _heroController;
 
         private bool _hasSyncedProfile;
+        public string SyncedUserId { get; private set; }
+        public string SyncedDisplayName { get; private set; }
 
         private void Awake()
         {
@@ -44,8 +47,11 @@ namespace ProjectZ.Network
         }
 
         [ServerRpc]
-        private void CmdSyncProfile(string displayName, string primaryId, string secondaryId, string meleeId, string selectedHeroId)
+        private void CmdSyncProfile(string userId, string displayName, string primaryId, string secondaryId, string meleeId, string selectedHeroId)
         {
+            SyncedUserId = string.IsNullOrWhiteSpace(userId) ? string.Empty : userId.Trim();
+            SyncedDisplayName = string.IsNullOrWhiteSpace(displayName) ? $"player_{OwnerId}" : displayName.Trim();
+
             // Update inventory
             if (_inventory != null)
             {
@@ -68,7 +74,39 @@ namespace ProjectZ.Network
             }
 
             // Sync the name (if we have a PlayerName component, set it here)
-            Debug.Log($"[Server] Profile synced for client {OwnerId}: Name={displayName}");
+            Debug.Log($"[Server] Profile synced for client {OwnerId}: Name={SyncedDisplayName} UserId={SyncedUserId}");
+        }
+
+        [TargetRpc]
+        private void TargetReceiveAuthoritativeMatchResult(FishNet.Connection.NetworkConnection conn, string serializedPayload)
+        {
+            if (string.IsNullOrWhiteSpace(serializedPayload))
+                return;
+
+            try
+            {
+                AuthoritativeMatchResultPayload payload = JsonConvert.DeserializeObject<AuthoritativeMatchResultPayload>(serializedPayload);
+                if (!AuthoritativeMatchResultSigning.HasValidBasics(payload))
+                {
+                    Debug.LogWarning("[ProfileSyncer] Ignored malformed signed match result payload.");
+                    return;
+                }
+
+                NakamaManager.Instance?.QueueAuthoritativeMatchResult(payload);
+            }
+            catch (JsonException exception)
+            {
+                Debug.LogWarning($"[ProfileSyncer] Failed to deserialize signed match result payload: {exception.Message}");
+            }
+        }
+
+        [Server]
+        public void DeliverAuthoritativeMatchResult(FishNet.Connection.NetworkConnection ownerConnection, string serializedPayload)
+        {
+            if (ownerConnection == null || !ownerConnection.IsValid || string.IsNullOrWhiteSpace(serializedPayload))
+                return;
+
+            TargetReceiveAuthoritativeMatchResult(ownerConnection, serializedPayload);
         }
 
         private void TrySyncProfileOrSubscribe()
@@ -109,6 +147,7 @@ namespace ProjectZ.Network
                 $"{profile.primaryWeaponId} / {profile.secondaryWeaponId} / {profile.meleeWeaponId}");
 
             CmdSyncProfile(
+                NakamaManager.Instance != null ? NakamaManager.Instance.UserId : string.Empty,
                 profile.displayName,
                 profile.primaryWeaponId,
                 profile.secondaryWeaponId,

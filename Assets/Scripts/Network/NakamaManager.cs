@@ -68,6 +68,16 @@ namespace ProjectZ.Network
         private const string RPC_PURCHASE_OFFER = "projectz_purchase_offer";
         private const string RPC_APPLY_RANKED_RESULT = "projectz_apply_ranked_result";
         private const string RPC_SUBMIT_MATCH_TELEMETRY = "projectz_submit_match_telemetry";
+        private const string RPC_FINALIZE_SIGNED_MATCH_RESULT = "projectz_finalize_signed_match_result";
+        private const float SIGNED_RESULT_WAIT_WINDOW_SECONDS = 5f;
+        private const float SIGNED_RESULT_REUSE_WINDOW_SECONDS = 15f;
+
+        private AuthoritativeMatchResultPayload _pendingAuthoritativeMatchResult;
+        private Task<BackendSignedMatchResultResponse> _authoritativeMatchResultTask;
+        private string _authoritativeMatchResultTaskKey;
+        private BackendSignedMatchResultResponse _lastAuthoritativeMatchResultResponse;
+        private string _lastAuthoritativeMatchResultKey;
+        private float _lastAuthoritativeMatchResultAt;
 
         // ─── Unity Lifecycle ──────────────────────────────────────────────
         private void Awake()
@@ -267,6 +277,10 @@ namespace ProjectZ.Network
             EnsureCachedProfile();
             int previousRating = CachedProfile.elo;
 
+            BackendSignedMatchResultResponse signedResponse = await TryAwaitSignedMatchResultAsync();
+            if (signedResponse != null && signedResponse.succeeded)
+                return CompetitiveRankSystem.BuildProgressionResult(signedResponse.previousRating, signedResponse.newRating);
+
             BackendRankedResultResponse response = await CallBackendRpcAsync<BackendRankedResultResponse>(
                 RPC_APPLY_RANKED_RESULT,
                 new BackendRankedResultRequest
@@ -418,6 +432,114 @@ namespace ProjectZ.Network
             profile.Sanitize();
             CachedProfile = profile;
             OnProfileLoaded?.Invoke(CachedProfile);
+        }
+
+        public void QueueAuthoritativeMatchResult(AuthoritativeMatchResultPayload payload)
+        {
+            if (!AuthoritativeMatchResultSigning.HasValidBasics(payload))
+            {
+                Debug.LogWarning("[Nakama] Ignored malformed authoritative match result payload.");
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(UserId) &&
+                !string.Equals(payload.userId, UserId, StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.LogWarning("[Nakama] Ignored authoritative match result for a different user.");
+                return;
+            }
+
+            _pendingAuthoritativeMatchResult = payload;
+
+            if (IsAuthenticated)
+                _ = EnsureAuthoritativeMatchResultSubmittedAsync(payload);
+        }
+
+        private async Task<BackendSignedMatchResultResponse> TryAwaitSignedMatchResultAsync()
+        {
+            float deadline = Time.unscaledTime + SIGNED_RESULT_WAIT_WINDOW_SECONDS;
+            while (Time.unscaledTime <= deadline)
+            {
+                if (_authoritativeMatchResultTask != null)
+                {
+                    BackendSignedMatchResultResponse awaitedResponse = await _authoritativeMatchResultTask;
+                    if (awaitedResponse != null && awaitedResponse.succeeded)
+                        return awaitedResponse;
+                }
+
+                if (HasRecentSignedMatchResult())
+                    return _lastAuthoritativeMatchResultResponse;
+
+                if (_pendingAuthoritativeMatchResult != null &&
+                    string.IsNullOrWhiteSpace(_authoritativeMatchResultTaskKey))
+                {
+                    BackendSignedMatchResultResponse response = await EnsureAuthoritativeMatchResultSubmittedAsync(_pendingAuthoritativeMatchResult);
+                    if (response != null && response.succeeded)
+                        return response;
+                }
+
+                await Task.Delay(100);
+            }
+
+            return HasRecentSignedMatchResult() ? _lastAuthoritativeMatchResultResponse : null;
+        }
+
+        private bool HasRecentSignedMatchResult()
+        {
+            return _lastAuthoritativeMatchResultResponse != null
+                && !string.IsNullOrWhiteSpace(_lastAuthoritativeMatchResultKey)
+                && (Time.unscaledTime - _lastAuthoritativeMatchResultAt) <= SIGNED_RESULT_REUSE_WINDOW_SECONDS;
+        }
+
+        private async Task<BackendSignedMatchResultResponse> EnsureAuthoritativeMatchResultSubmittedAsync(AuthoritativeMatchResultPayload payload)
+        {
+            if (payload == null || !IsAuthenticated)
+                return null;
+
+            if (!string.IsNullOrWhiteSpace(_lastAuthoritativeMatchResultKey) &&
+                string.Equals(_lastAuthoritativeMatchResultKey, payload.matchKey, StringComparison.OrdinalIgnoreCase) &&
+                _lastAuthoritativeMatchResultResponse != null)
+            {
+                return _lastAuthoritativeMatchResultResponse;
+            }
+
+            if (_authoritativeMatchResultTask != null &&
+                string.Equals(_authoritativeMatchResultTaskKey, payload.matchKey, StringComparison.OrdinalIgnoreCase))
+            {
+                return await _authoritativeMatchResultTask;
+            }
+
+            _authoritativeMatchResultTaskKey = payload.matchKey;
+            _authoritativeMatchResultTask = SubmitAuthoritativeMatchResultInternalAsync(payload);
+            return await _authoritativeMatchResultTask;
+        }
+
+        private async Task<BackendSignedMatchResultResponse> SubmitAuthoritativeMatchResultInternalAsync(AuthoritativeMatchResultPayload payload)
+        {
+            try
+            {
+                BackendSignedMatchResultResponse response = await CallBackendRpcAsync<BackendSignedMatchResultResponse>(
+                    RPC_FINALIZE_SIGNED_MATCH_RESULT,
+                    payload);
+
+                if (response?.profile != null)
+                    ApplyBackendProfile(response.profile);
+
+                if (response != null && response.succeeded)
+                {
+                    _lastAuthoritativeMatchResultResponse = response;
+                    _lastAuthoritativeMatchResultKey = string.IsNullOrWhiteSpace(response.matchKey) ? payload.matchKey : response.matchKey;
+                    _lastAuthoritativeMatchResultAt = Time.unscaledTime;
+                    _pendingAuthoritativeMatchResult = null;
+                }
+
+                return response;
+            }
+            finally
+            {
+                _authoritativeMatchResultTask = null;
+                _authoritativeMatchResultTaskKey = null;
+            }
         }
 
         public bool HasPendingMatchToken()
@@ -592,6 +714,9 @@ namespace ProjectZ.Network
             }
 
             PendingMatchToken = null;
+            _pendingAuthoritativeMatchResult = null;
+            _authoritativeMatchResultTask = null;
+            _authoritativeMatchResultTaskKey = null;
         }
 
         private void HandleSocketClosed(string reason)
@@ -742,11 +867,19 @@ namespace ProjectZ.Network
         }
 
         [Serializable]
-        private sealed class BackendRankedResultResponse : BackendProfileRpcResponse
+        private class BackendRankedResultResponse : BackendProfileRpcResponse
         {
             public int previousRating;
             public int newRating;
             public int delta;
+        }
+
+        [Serializable]
+        private sealed class BackendSignedMatchResultResponse : BackendRankedResultResponse
+        {
+            public string matchKey;
+            public bool telemetrySaved;
+            public bool alreadyProcessed;
         }
 
         [Serializable]

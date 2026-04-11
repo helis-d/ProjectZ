@@ -8,10 +8,12 @@ const RPC_UNLOCK_HERO = "projectz_unlock_hero";
 const RPC_PURCHASE_OFFER = "projectz_purchase_offer";
 const RPC_APPLY_RANKED_RESULT = "projectz_apply_ranked_result";
 const RPC_SUBMIT_MATCH_TELEMETRY = "projectz_submit_match_telemetry";
+const RPC_FINALIZE_SIGNED_MATCH_RESULT = "projectz_finalize_signed_match_result";
 
 const MATCH_HANDLER_ID = "custom_lobby";
 const RANKED_LEADERBOARD_ID = "ranked_rating";
 const TELEMETRY_COLLECTION = "match_telemetry";
+const MATCH_RESULT_RECEIPTS_COLLECTION = "match_result_receipts";
 const WALLET_KEY_COMMAND_CREDITS = "command_credits";
 const WALLET_KEY_ZCORE = "z_core";
 
@@ -26,6 +28,8 @@ const MATCH_SERVER_PORT_ENV = "PROJECTZ_MATCH_SERVER_PORT";
 const ENABLE_ALPHA_ENTITLEMENTS_ENV = "PROJECTZ_ENABLE_ALPHA_ENTITLEMENTS";
 const ENABLE_SEASON2_ENV = "PROJECTZ_ENABLE_SEASON2";
 const ENABLE_EVENT_CONTENT_ENV = "PROJECTZ_ENABLE_EVENT_CONTENT";
+const MATCH_RESULT_SECRET_ENV = "PROJECTZ_MATCH_RESULT_SECRET";
+const MATCH_RESULT_MAX_AGE_SECONDS = 900;
 
 const PURCHASE_STATUS_SUCCESS = 0;
 const PURCHASE_STATUS_INVALID_PROFILE = 1;
@@ -119,6 +123,43 @@ interface RankedResultPayload {
     wasMvp: boolean;
 }
 
+interface SignedMatchResultPayload {
+    version: number;
+    matchKey: string;
+    issuedAtUnix: number;
+    userId: string;
+    mapId: string;
+    gameMode: string;
+    playerTeam: string;
+    winningTeam: string;
+    won: boolean;
+    attackerRoundsWon: number;
+    defenderRoundsWon: number;
+    kills: number;
+    deaths: number;
+    assists: number;
+    wasMvp: boolean;
+    heroId: string;
+    matchDurationSeconds: number;
+    headshotCount: number;
+    wallbangCount: number;
+    spherePlantsCount: number;
+    sphereDefusesCount: number;
+    ultimateActivations: number;
+    peakCreditsThisMatch: number;
+    mostUsedWeaponId: string;
+    signature: string;
+}
+
+interface MatchResultReceipt {
+    matchKey: string;
+    previousRating: number;
+    newRating: number;
+    delta: number;
+    telemetrySaved: boolean;
+    processedAtUnix: number;
+}
+
 interface WalletState {
     commandCredits: number;
     zCore: number;
@@ -144,6 +185,7 @@ let InitModule: nkruntime.InitModule = function(ctx, logger, nk, initializer) {
     initializer.registerRpc(RPC_PURCHASE_OFFER, RpcPurchaseOffer);
     initializer.registerRpc(RPC_APPLY_RANKED_RESULT, RpcApplyRankedResult);
     initializer.registerRpc(RPC_SUBMIT_MATCH_TELEMETRY, RpcSubmitMatchTelemetry);
+    initializer.registerRpc(RPC_FINALIZE_SIGNED_MATCH_RESULT, RpcFinalizeSignedMatchResult);
 };
 
 function MatchmakerMatched(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, matches: nkruntime.MatchmakerResult[]): string {
@@ -327,6 +369,82 @@ function RpcSubmitMatchTelemetry(ctx: nkruntime.Context, logger: nkruntime.Logge
     } catch (error) {
         logger.error("Telemetry RPC failed: " + errorToString(error));
         return JSON.stringify(telemetryResponse(false, "server_error", "Telemetry write failed.", null));
+    }
+}
+
+function RpcFinalizeSignedMatchResult(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+    if (!ctx.userId) {
+        return JSON.stringify(signedMatchResultResponse(false, "unauthorized", "Authentication required.", null, 0, 0, 0, null, false, false));
+    }
+
+    try {
+        var request = buildSignedMatchResultPayload(parsePayload(payload), ctx.userId);
+        var validationError = validateSignedMatchResultPayload(ctx, nk, request);
+        if (validationError) {
+            return JSON.stringify(signedMatchResultResponse(false, validationError.code, validationError.message, null, 0, 0, 0, request.matchKey, false, false));
+        }
+
+        var loaded = loadOrCreateProfile(ctx, nk);
+        var existingReceipt = readMatchResultReceipt(ctx.userId, request.matchKey, nk);
+        if (existingReceipt) {
+            return JSON.stringify(signedMatchResultResponse(true, null, "Signed match result already processed.", loaded.profile, existingReceipt.previousRating, existingReceipt.newRating, existingReceipt.delta, existingReceipt.matchKey, existingReceipt.telemetrySaved, true));
+        }
+
+        var previousRating = loaded.profile.elo;
+        var newRating = previousRating;
+        var delta = 0;
+
+        if (request.gameMode === "ranked") {
+            var performance = signedPayloadToRankedResult(request, loaded.profile);
+            delta = calculateRankedRatingDelta(performance, previousRating, loaded.profile.rankedMatchesPlayed);
+            newRating = applyRankedRatingDelta(previousRating, delta);
+
+            loaded.profile.elo = newRating;
+            loaded.profile.rankedMatchesPlayed += 1;
+            if (performance.won) {
+                loaded.profile.rankedWins += 1;
+            } else {
+                loaded.profile.rankedLosses += 1;
+            }
+            if (loaded.profile.peakElo < newRating) {
+                loaded.profile.peakElo = newRating;
+            }
+
+            try {
+                nk.leaderboardRecordWrite(
+                    RANKED_LEADERBOARD_ID,
+                    ctx.userId,
+                    ctx.username || loaded.profile.displayName,
+                    newRating,
+                    loaded.profile.peakElo,
+                    {
+                        delta: delta,
+                        won: performance.won,
+                        opponentAverageRating: performance.opponentAverageRating,
+                        rankedMatchesPlayed: loaded.profile.rankedMatchesPlayed,
+                        matchKey: request.matchKey
+                    },
+                    nkruntime.OverrideOperator.SET);
+            } catch (error) {
+                logger.info("Signed ranked leaderboard write skipped: " + errorToString(error));
+            }
+        }
+
+        var telemetrySaved = writeSignedTelemetry(ctx.userId, nk, request, previousRating, delta);
+        writeProfile(ctx.userId, loaded.profile, loaded.version, nk);
+        writeMatchResultReceipt(ctx.userId, request.matchKey, nk, {
+            matchKey: request.matchKey,
+            previousRating: previousRating,
+            newRating: newRating,
+            delta: delta,
+            telemetrySaved: telemetrySaved,
+            processedAtUnix: Math.floor(Date.now() / 1000)
+        });
+
+        return JSON.stringify(signedMatchResultResponse(true, null, "Signed match result applied.", loaded.profile, previousRating, newRating, delta, request.matchKey, telemetrySaved, false));
+    } catch (error) {
+        logger.error("Signed match result RPC failed: " + errorToString(error));
+        return JSON.stringify(signedMatchResultResponse(false, "server_error", "Signed match result validation failed.", null, 0, 0, 0, null, false, false));
     }
 }
 
@@ -592,6 +710,31 @@ function telemetryResponse(succeeded: boolean, errorCode: string | null, message
     };
 }
 
+function signedMatchResultResponse(
+    succeeded: boolean,
+    errorCode: string | null,
+    message: string,
+    profile: PlayerProfileData | null,
+    previousRating: number,
+    newRating: number,
+    delta: number,
+    matchKey: string | null,
+    telemetrySaved: boolean,
+    alreadyProcessed: boolean) {
+    return {
+        succeeded: succeeded,
+        errorCode: errorCode,
+        message: message,
+        profile: profile,
+        previousRating: previousRating,
+        newRating: newRating,
+        delta: delta,
+        matchKey: matchKey,
+        telemetrySaved: telemetrySaved,
+        alreadyProcessed: alreadyProcessed
+    };
+}
+
 function purchase(status: number, offerId: string | null, contentId: string | null, message: string, currencyType: number, amountSpent: number) {
     return { status: status, offerId: offerId, contentId: contentId, message: message, currencyType: currencyType, amountSpent: amountSpent };
 }
@@ -613,6 +756,196 @@ function ensureRankedLeaderboard(logger: nkruntime.Logger, nk: nkruntime.Nakama)
     } catch (error) {
         logger.info("Ranked leaderboard create skipped: " + errorToString(error));
     }
+}
+
+function buildSignedMatchResultPayload(raw: any, userId: string): SignedMatchResultPayload {
+    return {
+        version: clampMin(readNumber(raw.version, 1), 1),
+        matchKey: normalizeId(raw.matchKey),
+        issuedAtUnix: clampMin(readNumber(raw.issuedAtUnix, 0), 0),
+        userId: normalizeId(raw.userId || userId),
+        mapId: normalizeId(raw.mapId),
+        gameMode: normalizeId(raw.gameMode),
+        playerTeam: normalizeId(raw.playerTeam),
+        winningTeam: normalizeId(raw.winningTeam),
+        won: !!raw.won,
+        attackerRoundsWon: clampMin(readNumber(raw.attackerRoundsWon, 0), 0),
+        defenderRoundsWon: clampMin(readNumber(raw.defenderRoundsWon, 0), 0),
+        kills: clampMin(readNumber(raw.kills, 0), 0),
+        deaths: clampMin(readNumber(raw.deaths, 0), 0),
+        assists: clampMin(readNumber(raw.assists, 0), 0),
+        wasMvp: !!raw.wasMvp,
+        heroId: normalizeId(raw.heroId),
+        matchDurationSeconds: clampMin(readNumber(raw.matchDurationSeconds, 0), 0),
+        headshotCount: clampMin(readNumber(raw.headshotCount, 0), 0),
+        wallbangCount: clampMin(readNumber(raw.wallbangCount, 0), 0),
+        spherePlantsCount: clampMin(readNumber(raw.spherePlantsCount, 0), 0),
+        sphereDefusesCount: clampMin(readNumber(raw.sphereDefusesCount, 0), 0),
+        ultimateActivations: clampMin(readNumber(raw.ultimateActivations, 0), 0),
+        peakCreditsThisMatch: clampMin(readNumber(raw.peakCreditsThisMatch, 0), 0),
+        mostUsedWeaponId: normalizeId(raw.mostUsedWeaponId),
+        signature: normalizeId(raw.signature)
+    };
+}
+
+function validateSignedMatchResultPayload(ctx: nkruntime.Context, nk: nkruntime.Nakama, payload: SignedMatchResultPayload): { code: string; message: string } | null {
+    if (!payload.matchKey || !payload.userId || !payload.signature) {
+        return { code: "invalid_payload", message: "Signed match result is missing required fields." };
+    }
+
+    if (payload.userId !== normalizeId(ctx.userId)) {
+        return { code: "user_mismatch", message: "Signed match result user mismatch." };
+    }
+
+    var nowUnix = Math.floor(Date.now() / 1000);
+    if (payload.issuedAtUnix <= 0 || Math.abs(nowUnix - payload.issuedAtUnix) > MATCH_RESULT_MAX_AGE_SECONDS) {
+        return { code: "expired_signature", message: "Signed match result payload expired." };
+    }
+
+    var expectedSignature = computeSignedMatchResultSignature(ctx, nk, payload);
+    if (expectedSignature !== payload.signature) {
+        return { code: "invalid_signature", message: "Signed match result signature mismatch." };
+    }
+
+    return null;
+}
+
+function computeSignedMatchResultSignature(ctx: nkruntime.Context, nk: nkruntime.Nakama, payload: SignedMatchResultPayload): string {
+    return arrayBufferToHex(nk.hmacSha256Hash(buildSignedMatchResultCanonicalString(payload), resolveMatchResultSecret(ctx)));
+}
+
+function buildSignedMatchResultCanonicalString(payload: SignedMatchResultPayload): string {
+    return [
+        clampMin(readNumber(payload.version, 1), 1),
+        normalizeId(payload.matchKey),
+        clampMin(readNumber(payload.issuedAtUnix, 0), 0),
+        normalizeId(payload.userId),
+        normalizeId(payload.mapId),
+        normalizeId(payload.gameMode),
+        normalizeId(payload.playerTeam),
+        normalizeId(payload.winningTeam),
+        payload.won ? 1 : 0,
+        clampMin(readNumber(payload.attackerRoundsWon, 0), 0),
+        clampMin(readNumber(payload.defenderRoundsWon, 0), 0),
+        clampMin(readNumber(payload.kills, 0), 0),
+        clampMin(readNumber(payload.deaths, 0), 0),
+        clampMin(readNumber(payload.assists, 0), 0),
+        payload.wasMvp ? 1 : 0,
+        normalizeId(payload.heroId),
+        clampMin(readNumber(payload.matchDurationSeconds, 0), 0),
+        clampMin(readNumber(payload.headshotCount, 0), 0),
+        clampMin(readNumber(payload.wallbangCount, 0), 0),
+        clampMin(readNumber(payload.spherePlantsCount, 0), 0),
+        clampMin(readNumber(payload.sphereDefusesCount, 0), 0),
+        clampMin(readNumber(payload.ultimateActivations, 0), 0),
+        clampMin(readNumber(payload.peakCreditsThisMatch, 0), 0),
+        normalizeId(payload.mostUsedWeaponId)
+    ].join("|");
+}
+
+function resolveMatchResultSecret(ctx: nkruntime.Context): string {
+    var configured = readStringEnv(ctx, MATCH_RESULT_SECRET_ENV, "");
+    return configured ? configured : "projectz-dev-match-result-secret";
+}
+
+function arrayBufferToHex(buffer: ArrayBuffer): string {
+    var bytes = new Uint8Array(buffer);
+    var out = "";
+    for (var i = 0; i < bytes.length; i++) {
+        var hex = bytes[i].toString(16);
+        out += hex.length === 1 ? "0" + hex : hex;
+    }
+    return out;
+}
+
+function signedPayloadToRankedResult(payload: SignedMatchResultPayload, profile: PlayerProfileData): RankedResultPayload {
+    var attackerRoundsWon = clampMin(readNumber(payload.attackerRoundsWon, 0), 0);
+    var defenderRoundsWon = clampMin(readNumber(payload.defenderRoundsWon, 0), 0);
+    var highScore = attackerRoundsWon > defenderRoundsWon ? attackerRoundsWon : defenderRoundsWon;
+    var lowScore = attackerRoundsWon > defenderRoundsWon ? defenderRoundsWon : attackerRoundsWon;
+
+    return {
+        opponentAverageRating: clampMin(readNumber(profile.elo, MINIMUM_RATING), MINIMUM_RATING),
+        won: !!payload.won,
+        kills: clampMin(readNumber(payload.kills, 0), 0),
+        deaths: clampMin(readNumber(payload.deaths, 0), 0),
+        assists: clampMin(readNumber(payload.assists, 0), 0),
+        roundsWon: payload.won ? highScore : lowScore,
+        roundsLost: payload.won ? lowScore : highScore,
+        wasMvp: !!payload.wasMvp
+    };
+}
+
+function writeSignedTelemetry(userId: string, nk: nkruntime.Nakama, payload: SignedMatchResultPayload, eloBefore: number, eloDelta: number): boolean {
+    try {
+        nk.storageWrite([{
+            collection: TELEMETRY_COLLECTION,
+            key: payload.matchKey,
+            userId: userId,
+            value: {
+                user_id: userId,
+                match_key: payload.matchKey,
+                timestamp_unix: payload.issuedAtUnix,
+                map_id: payload.mapId || "unknown_map",
+                game_mode: payload.gameMode || "unknown_mode",
+                winning_team: payload.winningTeam || "unknown_team",
+                match_duration_sec: clampMin(readNumber(payload.matchDurationSeconds, 0), 0),
+                total_rounds: clampMin(readNumber(payload.attackerRoundsWon, 0), 0) + clampMin(readNumber(payload.defenderRoundsWon, 0), 0),
+                attacker_rounds_won: clampMin(readNumber(payload.attackerRoundsWon, 0), 0),
+                defender_rounds_won: clampMin(readNumber(payload.defenderRoundsWon, 0), 0),
+                kills: clampMin(readNumber(payload.kills, 0), 0),
+                deaths: clampMin(readNumber(payload.deaths, 0), 0),
+                assists: clampMin(readNumber(payload.assists, 0), 0),
+                headshot_count: clampMin(readNumber(payload.headshotCount, 0), 0),
+                wallbang_count: clampMin(readNumber(payload.wallbangCount, 0), 0),
+                was_mvp: !!payload.wasMvp,
+                hero_id: normalizeId(payload.heroId),
+                most_used_weapon_id: normalizeId(payload.mostUsedWeaponId),
+                sphere_plants: clampMin(readNumber(payload.spherePlantsCount, 0), 0),
+                sphere_defuses: clampMin(readNumber(payload.sphereDefusesCount, 0), 0),
+                ultimate_activations: clampMin(readNumber(payload.ultimateActivations, 0), 0),
+                elo_before: clampMin(readNumber(eloBefore, MINIMUM_RATING), MINIMUM_RATING),
+                elo_delta: readNumber(eloDelta, 0),
+                peak_credits_this_match: clampMin(readNumber(payload.peakCreditsThisMatch, 0), 0)
+            },
+            permissionRead: 0,
+            permissionWrite: 0
+        }]);
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
+function readMatchResultReceipt(userId: string, matchKey: string, nk: nkruntime.Nakama): MatchResultReceipt | null {
+    var objects = nk.storageRead([{ collection: MATCH_RESULT_RECEIPTS_COLLECTION, key: matchKey, userId: userId }]);
+    if (!objects || objects.length === 0) {
+        return null;
+    }
+
+    return castMatchResultReceipt(objects[0].value);
+}
+
+function writeMatchResultReceipt(userId: string, matchKey: string, nk: nkruntime.Nakama, receipt: MatchResultReceipt): void {
+    nk.storageWrite([{
+        collection: MATCH_RESULT_RECEIPTS_COLLECTION,
+        key: matchKey,
+        userId: userId,
+        value: receipt,
+        permissionRead: 0,
+        permissionWrite: 0
+    }]);
+}
+
+function castMatchResultReceipt(raw: {[key: string]: any}): MatchResultReceipt {
+    return {
+        matchKey: normalizeId(raw.matchKey),
+        previousRating: clampMin(readNumber(raw.previousRating, MINIMUM_RATING), MINIMUM_RATING),
+        newRating: clampMin(readNumber(raw.newRating, MINIMUM_RATING), MINIMUM_RATING),
+        delta: readNumber(raw.delta, 0),
+        telemetrySaved: !!raw.telemetrySaved,
+        processedAtUnix: clampMin(readNumber(raw.processedAtUnix, 0), 0)
+    };
 }
 
 function resolveDefaultHero(profile: PlayerProfileData): string {

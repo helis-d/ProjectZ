@@ -3,6 +3,7 @@ using FishNet.Object;
 using ProjectZ.Economy;
 using ProjectZ.GameMode;
 using ProjectZ.Map;
+using ProjectZ.Network;
 using ProjectZ.Player;
 using ProjectZ.Sphere;
 using ProjectZ.UI;
@@ -107,6 +108,7 @@ namespace ProjectZ.Core
             TeamManager teamManager = EnsureComponent<TeamManager>(systems);
             EnsureComponent<RoundManager>(systems);
             EnsureComponent<EconomyManager>(systems);
+            EnsureComponent<AuthoritativeMatchResultRelay>(systems);
 
             if (createdByBootstrap || GameObject.Find("Bootstrap Spawn Points") != null)
                 EnsureSpawnPoints(teamManager, systems.transform);
