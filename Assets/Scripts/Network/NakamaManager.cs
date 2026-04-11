@@ -65,6 +65,8 @@ namespace ProjectZ.Network
         private const string RPC_SELECT_HERO = "projectz_select_hero";
         private const string RPC_UNLOCK_HERO = "projectz_unlock_hero";
         private const string RPC_PURCHASE_OFFER = "projectz_purchase_offer";
+        private const string RPC_APPLY_RANKED_RESULT = "projectz_apply_ranked_result";
+        private const string RPC_SUBMIT_MATCH_TELEMETRY = "projectz_submit_match_telemetry";
 
         // ─── Unity Lifecycle ──────────────────────────────────────────────
         private void Awake()
@@ -229,8 +231,8 @@ namespace ProjectZ.Network
                         Collection = STORAGE_COLLECTION,
                         Key = STORAGE_KEY_PROFILE,
                         Value = json,
-                        PermissionRead = 1,  // Owner can read
-                        PermissionWrite = 1  // Owner can write
+                        PermissionRead = 1,
+                        PermissionWrite = 1
                     }
                 });
                 Debug.Log("[Nakama] Profile saved successfully.");
@@ -254,24 +256,30 @@ namespace ProjectZ.Network
         public async Task<RankedProgressionResult> ApplyRankedMatchResultAsync(RankedMatchPerformance performance)
         {
             EnsureCachedProfile();
-
             int previousRating = CachedProfile.elo;
-            int delta = CompetitiveRankSystem.CalculateRatingDelta(performance);
-            int newRating = CompetitiveRankSystem.ApplyRatingDelta(previousRating, delta);
 
-            CachedProfile.elo = newRating;
-            CachedProfile.rankedMatchesPlayed++;
-            if (performance.Won)
-                CachedProfile.rankedWins++;
-            else
-                CachedProfile.rankedLosses++;
+            BackendRankedResultResponse response = await CallBackendRpcAsync<BackendRankedResultResponse>(
+                RPC_APPLY_RANKED_RESULT,
+                new BackendRankedResultRequest
+                {
+                    opponentAverageRating = performance.OpponentAverageRating,
+                    won = performance.Won,
+                    kills = performance.Kills,
+                    deaths = performance.Deaths,
+                    assists = performance.Assists,
+                    roundsWon = performance.RoundsWon,
+                    roundsLost = performance.RoundsLost,
+                    wasMvp = performance.WasMvp
+                });
 
-            CachedProfile.peakElo = Mathf.Max(CachedProfile.peakElo, CachedProfile.elo);
-            CachedProfile.Sanitize();
+            if (response?.profile != null)
+                ApplyBackendProfile(response.profile);
 
-            RankedProgressionResult result = CompetitiveRankSystem.BuildProgressionResult(previousRating, newRating);
-            await SavePlayerProfileAsync(CachedProfile);
-            return result;
+            if (response != null && response.succeeded)
+                return CompetitiveRankSystem.BuildProgressionResult(response.previousRating, response.newRating);
+
+            Debug.LogWarning("[Nakama] Ranked result persistence failed; returning unchanged progression snapshot.");
+            return CompetitiveRankSystem.BuildProgressionResult(previousRating, previousRating);
         }
 
         public bool OwnsHero(string heroId)
@@ -612,30 +620,45 @@ namespace ProjectZ.Network
                 return;
             }
 
-            // Stamp caller info before serialising.
-            telemetry.userId    = UserId;
-            telemetry.timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            telemetry.matchKey  = Guid.NewGuid().ToString("N")[..12]; // Short unique key
-
             try
             {
-                string json = JsonConvert.SerializeObject(telemetry, Formatting.None);
-
-                await _client.WriteStorageObjectsAsync(_session, new WriteStorageObject[]
-                {
-                    new WriteStorageObject
+                BackendTelemetryResponse response = await CallBackendRpcAsync<BackendTelemetryResponse>(
+                    RPC_SUBMIT_MATCH_TELEMETRY,
+                    new BackendTelemetryRequest
                     {
-                        Collection     = TELEMETRY_COLLECTION,
-                        Key            = telemetry.matchKey,
-                        Value          = json,
-                        PermissionRead  = 2,   // Public read — dev dashboard can query any player
-                        PermissionWrite = 1    // Only owner can write (client-authoritative record)
-                    }
-                });
+                        mapId = telemetry.mapId,
+                        gameMode = telemetry.gameMode,
+                        winningTeam = telemetry.winningTeam,
+                        matchDurationSeconds = telemetry.matchDurationSeconds,
+                        totalRoundsPlayed = telemetry.totalRoundsPlayed,
+                        attackerRoundsWon = telemetry.attackerRoundsWon,
+                        defenderRoundsWon = telemetry.defenderRoundsWon,
+                        kills = telemetry.kills,
+                        deaths = telemetry.deaths,
+                        assists = telemetry.assists,
+                        headshotCount = telemetry.headshotCount,
+                        wallbangCount = telemetry.wallbangCount,
+                        wasMvp = telemetry.wasMvp,
+                        heroId = telemetry.heroId,
+                        mostUsedWeaponId = telemetry.mostUsedWeaponId,
+                        spherePlantsCount = telemetry.spherePlantsCount,
+                        sphereDefusesCount = telemetry.sphereDefusesCount,
+                        ultimateActivations = telemetry.ultimateActivations,
+                        eloBefore = telemetry.eloBefore,
+                        eloDelta = telemetry.eloDelta,
+                        peakCreditsThisMatch = telemetry.peakCreditsThisMatch
+                    });
 
-                Debug.Log($"[Nakama] 📊 Telemetry saved — Match: {telemetry.matchKey} " +
-                          $"| Map: {telemetry.mapId} | Duration: {telemetry.matchDurationSeconds:F0}s " +
-                          $"| Winner: {telemetry.winningTeam}");
+                if (response != null && response.succeeded)
+                {
+                    telemetry.userId = UserId;
+                    telemetry.matchKey = response.matchKey;
+                    Debug.Log($"[Nakama] Telemetry saved authoritatively - Match: {response.matchKey} | Map: {telemetry.mapId} | Winner: {telemetry.winningTeam}");
+                }
+                else
+                {
+                    Debug.LogWarning($"[Nakama] Telemetry RPC returned a failure response: {response?.message}");
+                }
             }
             catch (Exception e)
             {
@@ -656,6 +679,45 @@ namespace ProjectZ.Network
         }
 
         [Serializable]
+        private sealed class BackendRankedResultRequest
+        {
+            public int opponentAverageRating;
+            public bool won;
+            public int kills;
+            public int deaths;
+            public int assists;
+            public int roundsWon;
+            public int roundsLost;
+            public bool wasMvp;
+        }
+
+        [Serializable]
+        private sealed class BackendTelemetryRequest
+        {
+            public string mapId;
+            public string gameMode;
+            public string winningTeam;
+            public float matchDurationSeconds;
+            public int totalRoundsPlayed;
+            public int attackerRoundsWon;
+            public int defenderRoundsWon;
+            public int kills;
+            public int deaths;
+            public int assists;
+            public int headshotCount;
+            public int wallbangCount;
+            public bool wasMvp;
+            public string heroId;
+            public string mostUsedWeaponId;
+            public int spherePlantsCount;
+            public int sphereDefusesCount;
+            public int ultimateActivations;
+            public int eloBefore;
+            public int eloDelta;
+            public int peakCreditsThisMatch;
+        }
+
+        [Serializable]
         private class BackendProfileRpcResponse
         {
             public bool succeeded;
@@ -668,6 +730,23 @@ namespace ProjectZ.Network
         private sealed class BackendPurchaseRpcResponse : BackendProfileRpcResponse
         {
             public BackendPurchasePayload purchase;
+        }
+
+        [Serializable]
+        private sealed class BackendRankedResultResponse : BackendProfileRpcResponse
+        {
+            public int previousRating;
+            public int newRating;
+            public int delta;
+        }
+
+        [Serializable]
+        private sealed class BackendTelemetryResponse
+        {
+            public bool succeeded;
+            public string errorCode;
+            public string message;
+            public string matchKey;
         }
 
         [Serializable]

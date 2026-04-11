@@ -5,13 +5,18 @@ const RPC_BACKEND_HEALTH = "projectz_backend_health";
 const RPC_SELECT_HERO = "projectz_select_hero";
 const RPC_UNLOCK_HERO = "projectz_unlock_hero";
 const RPC_PURCHASE_OFFER = "projectz_purchase_offer";
+const RPC_APPLY_RANKED_RESULT = "projectz_apply_ranked_result";
+const RPC_SUBMIT_MATCH_TELEMETRY = "projectz_submit_match_telemetry";
 
 const MATCH_HANDLER_ID = "custom_lobby";
 const RANKED_LEADERBOARD_ID = "ranked_rating";
+const TELEMETRY_COLLECTION = "match_telemetry";
 
 const STARTING_COMMAND_CREDITS = 1000;
 const STARTING_ZCORE = 0;
 const DEFAULT_HERO_UNLOCK_PRICE = 600;
+const MINIMUM_RATING = 1000;
+const PLACEMENT_MATCHES = 10;
 
 const MATCH_SERVER_ADDRESS_ENV = "PROJECTZ_MATCH_SERVER_ADDRESS";
 const MATCH_SERVER_PORT_ENV = "PROJECTZ_MATCH_SERVER_PORT";
@@ -100,6 +105,17 @@ interface CatalogOffer {
     availability: number;
 }
 
+interface RankedResultPayload {
+    opponentAverageRating: number;
+    won: boolean;
+    kills: number;
+    deaths: number;
+    assists: number;
+    roundsWon: number;
+    roundsLost: number;
+    wasMvp: boolean;
+}
+
 let InitModule: nkruntime.InitModule = function(ctx, logger, nk, initializer) {
     logger.info("Initializing ProjectZ authoritative backend module.");
     ensureRankedLeaderboard(logger, nk);
@@ -117,6 +133,8 @@ let InitModule: nkruntime.InitModule = function(ctx, logger, nk, initializer) {
     initializer.registerRpc(RPC_SELECT_HERO, RpcSelectHero);
     initializer.registerRpc(RPC_UNLOCK_HERO, RpcUnlockHero);
     initializer.registerRpc(RPC_PURCHASE_OFFER, RpcPurchaseOffer);
+    initializer.registerRpc(RPC_APPLY_RANKED_RESULT, RpcApplyRankedResult);
+    initializer.registerRpc(RPC_SUBMIT_MATCH_TELEMETRY, RpcSubmitMatchTelemetry);
 };
 
 function MatchmakerMatched(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, matches: nkruntime.MatchmakerResult[]): string {
@@ -170,7 +188,7 @@ function MatchTerminate(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nk
 }
 
 function RpcBackendHealth(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama): string {
-    return JSON.stringify({ succeeded: true, message: "ProjectZ backend online.", backendVersion: "phase1", rankedLeaderboardId: RANKED_LEADERBOARD_ID });
+    return JSON.stringify({ succeeded: true, message: "ProjectZ backend online.", backendVersion: "phase2", rankedLeaderboardId: RANKED_LEADERBOARD_ID });
 }
 
 function RpcSelectHero(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
@@ -202,6 +220,99 @@ function RpcPurchaseOffer(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: 
         var purchase = tryPurchaseOffer(ctx, profile, getOfferById(normalizeId(request.offerId)));
         return response(purchase.status === PURCHASE_STATUS_SUCCESS, purchaseStatusToCode(purchase.status), purchase.message, profile, purchase, purchase.status === PURCHASE_STATUS_SUCCESS);
     });
+}
+
+function RpcApplyRankedResult(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+    return runProfileRpc(ctx, logger, nk, function(profile) {
+        var request = parsePayload(payload);
+        var performance = buildRankedResultPayload(request, profile);
+        var previousRating = profile.elo;
+        var delta = calculateRankedRatingDelta(performance, previousRating, profile.rankedMatchesPlayed);
+        var newRating = applyRankedRatingDelta(previousRating, delta);
+
+        profile.elo = newRating;
+        profile.rankedMatchesPlayed += 1;
+        if (performance.won) {
+            profile.rankedWins += 1;
+        } else {
+            profile.rankedLosses += 1;
+        }
+        if (profile.peakElo < newRating) {
+            profile.peakElo = newRating;
+        }
+
+        try {
+            nk.leaderboardRecordWrite(
+                RANKED_LEADERBOARD_ID,
+                ctx.userId!,
+                ctx.username || profile.displayName,
+                newRating,
+                profile.peakElo,
+                {
+                    delta: delta,
+                    won: performance.won,
+                    opponentAverageRating: performance.opponentAverageRating,
+                    rankedMatchesPlayed: profile.rankedMatchesPlayed
+                },
+                nkruntime.OverrideOperator.SET);
+        } catch (error) {
+            logger.info("Ranked leaderboard write skipped: " + errorToString(error));
+        }
+
+        return rankedResponse(true, null, "Ranked result persisted.", profile, previousRating, newRating, delta, true);
+    });
+}
+
+function RpcSubmitMatchTelemetry(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+    if (!ctx.userId) {
+        return JSON.stringify(telemetryResponse(false, "unauthorized", "Authentication required.", null));
+    }
+
+    try {
+        var request = parsePayload(payload);
+        var matchKey = nk.uuidv4().replace(/-/g, "");
+        var timestampUnix = Math.floor(Date.now() / 1000);
+        var telemetry = {
+            user_id: ctx.userId,
+            match_key: matchKey,
+            timestamp_unix: timestampUnix,
+            map_id: stringifyValue(request.mapId, "unknown_map"),
+            game_mode: stringifyValue(request.gameMode, "unknown_mode"),
+            winning_team: stringifyValue(request.winningTeam, "unknown_team"),
+            match_duration_sec: clampMin(readNumber(request.matchDurationSeconds, 0), 0),
+            total_rounds: clampMin(readNumber(request.totalRoundsPlayed, 0), 0),
+            attacker_rounds_won: clampMin(readNumber(request.attackerRoundsWon, 0), 0),
+            defender_rounds_won: clampMin(readNumber(request.defenderRoundsWon, 0), 0),
+            kills: clampMin(readNumber(request.kills, 0), 0),
+            deaths: clampMin(readNumber(request.deaths, 0), 0),
+            assists: clampMin(readNumber(request.assists, 0), 0),
+            headshot_count: clampMin(readNumber(request.headshotCount, 0), 0),
+            wallbang_count: clampMin(readNumber(request.wallbangCount, 0), 0),
+            was_mvp: !!request.wasMvp,
+            hero_id: normalizeId(request.heroId),
+            most_used_weapon_id: normalizeId(request.mostUsedWeaponId),
+            sphere_plants: clampMin(readNumber(request.spherePlantsCount, 0), 0),
+            sphere_defuses: clampMin(readNumber(request.sphereDefusesCount, 0), 0),
+            ultimate_activations: clampMin(readNumber(request.ultimateActivations, 0), 0),
+            elo_before: clampMin(readNumber(request.eloBefore, MINIMUM_RATING), MINIMUM_RATING),
+            elo_delta: readNumber(request.eloDelta, 0),
+            peak_credits_this_match: clampMin(readNumber(request.peakCreditsThisMatch, 0), 0)
+        };
+
+        nk.storageWrite([{
+            collection: TELEMETRY_COLLECTION,
+            key: matchKey,
+            userId: ctx.userId,
+            value: telemetry,
+            permissionRead: 0,
+            permissionWrite: 0
+        }]);
+
+        return JSON.stringify(telemetryResponse(true, null, "Match telemetry saved.", matchKey));
+    } catch (error) {
+        logger.error("Telemetry RPC failed: " + errorToString(error));
+        return JSON.stringify(telemetryResponse(false, "server_error", "Telemetry write failed.", null));
+    }
 }
 
 function runProfileRpc(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, handler: (profile: PlayerProfileData) => any): string {
@@ -424,6 +535,28 @@ function response(succeeded: boolean, errorCode: string | null, message: string,
     return { succeeded: succeeded, errorCode: errorCode, message: message, profile: profile, purchase: purchaseResult || null, persist: !!persist };
 }
 
+function rankedResponse(succeeded: boolean, errorCode: string | null, message: string, profile: PlayerProfileData | null, previousRating: number, newRating: number, delta: number, persist: boolean) {
+    return {
+        succeeded: succeeded,
+        errorCode: errorCode,
+        message: message,
+        profile: profile,
+        previousRating: previousRating,
+        newRating: newRating,
+        delta: delta,
+        persist: persist
+    };
+}
+
+function telemetryResponse(succeeded: boolean, errorCode: string | null, message: string, matchKey: string | null) {
+    return {
+        succeeded: succeeded,
+        errorCode: errorCode,
+        message: message,
+        matchKey: matchKey
+    };
+}
+
 function purchase(status: number, offerId: string | null, contentId: string | null, message: string, currencyType: number, amountSpent: number) {
     return { status: status, offerId: offerId, contentId: contentId, message: message, currencyType: currencyType, amountSpent: amountSpent };
 }
@@ -452,6 +585,81 @@ function resolveDefaultHero(profile: PlayerProfileData): string {
     return profile.ownedHeroIds.length > 0 ? profile.ownedHeroIds[0] : STARTER_HERO_IDS[0];
 }
 
+function buildRankedResultPayload(raw: any, profile: PlayerProfileData): RankedResultPayload {
+    return {
+        opponentAverageRating: clampMin(readNumber(raw.opponentAverageRating, profile.elo), MINIMUM_RATING),
+        won: !!raw.won,
+        kills: clampMin(readNumber(raw.kills, 0), 0),
+        deaths: clampMin(readNumber(raw.deaths, 0), 0),
+        assists: clampMin(readNumber(raw.assists, 0), 0),
+        roundsWon: clampMin(readNumber(raw.roundsWon, 0), 0),
+        roundsLost: clampMin(readNumber(raw.roundsLost, 0), 0),
+        wasMvp: !!raw.wasMvp
+    };
+}
+
+function calculateRankedRatingDelta(performance: RankedResultPayload, playerRating: number, rankedMatchesPlayed: number): number {
+    var safePlayerRating = clampMin(readNumber(playerRating, MINIMUM_RATING), MINIMUM_RATING);
+    var safeOpponentRating = performance.opponentAverageRating > 0
+        ? clampMin(performance.opponentAverageRating, MINIMUM_RATING)
+        : safePlayerRating;
+
+    var expectedScore = 1 / (1 + Math.pow(10, (safeOpponentRating - safePlayerRating) / 400));
+    var actualScore = performance.won ? 1 : 0;
+    var kFactor = getRankedKFactor(safePlayerRating, rankedMatchesPlayed);
+    var baseDelta = Math.round(kFactor * (actualScore - expectedScore));
+    var performanceBonus = calculatePerformanceBonus(performance);
+    var delta = baseDelta + performanceBonus;
+
+    if (performance.won) {
+        var maxGain = rankedMatchesPlayed < PLACEMENT_MATCHES ? 48 : 38;
+        return clamp(delta, 10, maxGain);
+    }
+
+    var maxLoss = rankedMatchesPlayed < PLACEMENT_MATCHES ? -34 : -28;
+    return clamp(delta, maxLoss, 0);
+}
+
+function applyRankedRatingDelta(currentRating: number, delta: number): number {
+    return clampMin(readNumber(currentRating, MINIMUM_RATING) + readNumber(delta, 0), MINIMUM_RATING);
+}
+
+function getRankedKFactor(rating: number, rankedMatchesPlayed: number): number {
+    if (rankedMatchesPlayed < PLACEMENT_MATCHES) return 40;
+    if (rating < 1600) return 32;
+    if (rating < 2200) return 28;
+    if (rating < 2800) return 24;
+    if (rating < 3400) return 20;
+    return 16;
+}
+
+function calculatePerformanceBonus(performance: RankedResultPayload): number {
+    var roundsPlayed = Math.max(1, performance.roundsWon + performance.roundsLost);
+    var contribution = performance.kills + (performance.assists * 0.65);
+    var expectedContribution = Math.max(3, roundsPlayed * 0.45);
+    var contributionOffset = clamp(
+        (contribution - expectedContribution) / Math.max(4, roundsPlayed * 0.35),
+        -1,
+        1);
+
+    var survivalScore = performance.deaths <= 0
+        ? 1
+        : clamp((performance.kills + (performance.assists * 0.5)) / performance.deaths, 0, 2);
+
+    var roundMomentum = clamp((performance.roundsWon - performance.roundsLost) / roundsPlayed, -1, 1);
+    var rawBonus = (contributionOffset * 4)
+        + ((survivalScore - 0.5) * 4)
+        + (roundMomentum * 3)
+        + (performance.wasMvp ? 2 : 0);
+
+    var bonus = Math.round(rawBonus);
+    if (!performance.won) {
+        bonus = Math.min(bonus, 2);
+    }
+
+    return clamp(bonus, -6, 8);
+}
+
 function ownsHero(profile: PlayerProfileData, heroId: string): boolean { return containsString(profile.ownedHeroIds, heroId); }
 function isKnownHero(heroId: string): boolean { return containsString(ALL_HERO_IDS, heroId); }
 function getHeroDisplayName(heroId: string): string { return HERO_DISPLAY_NAMES[heroId] || heroId || "Unknown Hero"; }
@@ -460,6 +668,7 @@ function normalizeId(value: any): string { return typeof value === "string" ? va
 function stringifyValue(value: any, fallback: string): string { return typeof value === "string" && value.length > 0 ? value : fallback; }
 function readNumber(value: any, fallback: number): number { var parsed = Number(value); return isNaN(parsed) ? fallback : parsed; }
 function clampMin(value: number, minimum: number): number { return value < minimum ? minimum : value; }
+function clamp(value: number, minimum: number, maximum: number): number { return value < minimum ? minimum : (value > maximum ? maximum : value); }
 function errorToString(error: unknown): string { return error instanceof Error ? error.message : String(error); }
 function containsString(source: string[], value: string): boolean { for (var i = 0; i < source.length; i++) if (source[i] === value) return true; return false; }
 function normalizeIds(values: any): string[] { var src = Array.isArray(values) ? values : []; var out: string[] = []; for (var i = 0; i < src.length; i++) { var id = normalizeId(src[i]); if (id && !containsString(out, id)) out.push(id); } return out; }
