@@ -42,11 +42,20 @@ public class PistolWeapon : BaseWeapon
         PlaySound(data.shootSound);
 
         Camera cam = Camera.main;
-        Vector3 spread = new Vector3(
-            Random.Range(-data.bulletSpread, data.bulletSpread),
-            Random.Range(-data.bulletSpread, data.bulletSpread),
-            0f
-        );
+        Vector3 spread;
+        using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
+        {
+            byte[] bytes = new byte[8];
+            rng.GetBytes(bytes);
+            float randX = ((float)System.BitConverter.ToUInt32(bytes, 0) / uint.MaxValue) * 2f - 1f;
+            float randY = ((float)System.BitConverter.ToUInt32(bytes, 4) / uint.MaxValue) * 2f - 1f;
+            
+            spread = new Vector3(
+                randX * data.bulletSpread,
+                randY * data.bulletSpread,
+                0f
+            );
+        }
 
         Ray ray = new Ray(cam.transform.position, cam.transform.forward + spread);
 

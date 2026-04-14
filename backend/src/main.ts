@@ -14,8 +14,8 @@ const MATCH_HANDLER_ID = "custom_lobby";
 const RANKED_LEADERBOARD_ID = "ranked_rating";
 const TELEMETRY_COLLECTION = "match_telemetry";
 const MATCH_RESULT_RECEIPTS_COLLECTION = "match_result_receipts";
-const WALLET_KEY_COMMAND_CREDITS = "command_credits";
-const WALLET_KEY_ZCORE = "z_core";
+const WALLET_ID_COMMAND_CREDITS = "command_credits";
+const WALLET_ID_ZCORE = "z_core";
 
 const STARTING_COMMAND_CREDITS = 1000;
 const STARTING_ZCORE = 0;
@@ -390,9 +390,9 @@ function RpcFinalizeSignedMatchResult(ctx: nkruntime.Context, logger: nkruntime.
             return JSON.stringify(signedMatchResultResponse(true, null, "Signed match result already processed.", loaded.profile, existingReceipt.previousRating, existingReceipt.newRating, existingReceipt.delta, existingReceipt.matchKey, existingReceipt.telemetrySaved, true));
         }
 
-        var previousRating = loaded.profile.elo;
-        var newRating = previousRating;
-        var delta = 0;
+        let previousRating = loaded.profile.elo;
+        let newRating = previousRating;
+        let delta = 0;
 
         if (request.gameMode === "ranked") {
             var performance = signedPayloadToRankedResult(request, loaded.profile);
@@ -668,7 +668,7 @@ function spendWalletCurrency(userId: string, nk: nkruntime.Nakama, currencyType:
         return { succeeded: true, wallet: readWalletState(userId, nk) };
     }
 
-    var walletKey = getWalletKey(currencyType);
+    var walletKey = getWalletId(currencyType);
     if (!walletKey) {
         return { succeeded: false, wallet: readWalletState(userId, nk) };
     }
@@ -957,8 +957,8 @@ function ensureWalletState(userId: string, profile: PlayerProfileData, nk: nkrun
     var account = nk.accountGetId(userId);
     var rawWallet = account && account.wallet ? account.wallet : {};
 
-    var hasCommandCredits = hasWalletKey(rawWallet, WALLET_KEY_COMMAND_CREDITS);
-    var hasZCore = hasWalletKey(rawWallet, WALLET_KEY_ZCORE);
+    var hasCommandCredits = hasWalletId(rawWallet, WALLET_ID_COMMAND_CREDITS);
+    var hasZCore = hasWalletId(rawWallet, WALLET_ID_ZCORE);
     if (hasCommandCredits && hasZCore) {
         return walletStateFromRaw(rawWallet);
     }
@@ -967,13 +967,13 @@ function ensureWalletState(userId: string, profile: PlayerProfileData, nk: nkrun
     if (!hasCommandCredits) {
         var desiredCommandCredits = clampMin(readNumber(profile.commandCredits, STARTING_COMMAND_CREDITS), 0);
         if (desiredCommandCredits !== 0) {
-            bootstrapChanges[WALLET_KEY_COMMAND_CREDITS] = desiredCommandCredits;
+            bootstrapChanges[WALLET_ID_COMMAND_CREDITS] = desiredCommandCredits;
         }
     }
     if (!hasZCore) {
         var desiredZCore = clampMin(readNumber(profile.zCore, STARTING_ZCORE), 0);
         if (desiredZCore !== 0) {
-            bootstrapChanges[WALLET_KEY_ZCORE] = desiredZCore;
+            bootstrapChanges[WALLET_ID_ZCORE] = desiredZCore;
         }
     }
 
@@ -998,18 +998,18 @@ function applyWalletStateToProfile(profile: PlayerProfileData, wallet: WalletSta
 
 function walletStateFromRaw(wallet: {[key: string]: number}): WalletState {
     return {
-        commandCredits: clampMin(readNumber(wallet ? wallet[WALLET_KEY_COMMAND_CREDITS] : 0, 0), 0),
-        zCore: clampMin(readNumber(wallet ? wallet[WALLET_KEY_ZCORE] : 0, 0), 0)
+        commandCredits: clampMin(readNumber(wallet[WALLET_ID_COMMAND_CREDITS], 0), 0),
+        zCore: clampMin(readNumber(wallet[WALLET_ID_ZCORE], 0), 0)
     };
 }
 
-function hasWalletKey(wallet: {[key: string]: number}, key: string): boolean {
+function hasWalletId(wallet: {[key: string]: number}, key: string): boolean {
     return !!wallet && typeof wallet[key] === "number";
 }
 
-function getWalletKey(currencyType: number): string | null {
-    if (currencyType === CURRENCY_COMMAND_CREDITS) return WALLET_KEY_COMMAND_CREDITS;
-    if (currencyType === CURRENCY_ZCORE) return WALLET_KEY_ZCORE;
+function getWalletId(currencyType: number): string | null {
+    if (currencyType === CURRENCY_COMMAND_CREDITS) return WALLET_ID_COMMAND_CREDITS;
+    if (currencyType === CURRENCY_ZCORE) return WALLET_ID_ZCORE;
     return null;
 }
 
