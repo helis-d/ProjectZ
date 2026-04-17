@@ -6,10 +6,8 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     libstdc++6 \
     libc6 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Add a non-root user for security
-RUN useradd -ms /bin/bash unityuser
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -ms /bin/bash unityuser
 
 # Set working directory
 WORKDIR /home/unityuser/app
