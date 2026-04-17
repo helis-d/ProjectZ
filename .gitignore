@@ -5,6 +5,8 @@
 /[Bb]uilds/
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
+backend/node_modules/
+backend/build/
 .env
 *.csproj
 *.sln
