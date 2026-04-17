@@ -164,6 +164,23 @@ interface WalletState {
     zCore: number;
 }
 
+interface RankedResponsePayload {
+    succeeded: boolean;
+    errorCode: string | null;
+    message: string;
+    profile: PlayerProfileData | null;
+    previousRating: number;
+    newRating: number;
+    delta: number;
+    persist: boolean;
+}
+
+interface SignedMatchResultResponsePayload extends RankedResponsePayload {
+    matchKey: string | null;
+    telemetrySaved: boolean;
+    alreadyProcessed: boolean;
+}
+
 let InitModule: nkruntime.InitModule = function(ctx, logger, nk, initializer) {
     logger.info("Initializing ProjectZ authoritative backend module.");
     ensureRankedLeaderboard(logger, nk);
@@ -188,7 +205,7 @@ let InitModule: nkruntime.InitModule = function(ctx, logger, nk, initializer) {
 };
 
 function MatchmakerMatched(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, matches: nkruntime.MatchmakerResult[]): string {
-    var userIds = matches.map(function(match) { return match.presence.userId; });
+    const userIds = matches.map(function(match) { return match.presence.userId; });
     return nk.matchCreate(MATCH_HANDLER_ID, {
         ip: readStringEnv(ctx, MATCH_SERVER_ADDRESS_ENV, "127.0.0.1"),
         port: readNumberEnv(ctx, MATCH_SERVER_PORT_ENV, 7770),
@@ -197,7 +214,7 @@ function MatchmakerMatched(ctx: nkruntime.Context, logger: nkruntime.Logger, nk:
 }
 
 function MatchInit(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, params: {[key: string]: any}) {
-    var state: LobbyMatchState = {
+    const state: LobbyMatchState = {
         ip: stringifyValue(params.ip, "127.0.0.1"),
         port: readNumber(params.port, 7770),
         allowedUserIds: normalizeIds(params.allowedUserIds)
@@ -242,15 +259,15 @@ function RpcBackendHealth(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: 
 }
 
 function RpcGetProfileState(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama): string {
-    return runProfileRpc(ctx, logger, nk, function(profile) {
+    return runProfileRpc(ctx, logger, nk, function(userId, profile) {
         return response(true, null, "Profile state loaded.", profile, null, false);
     });
 }
 
 function RpcSelectHero(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
-    return runProfileRpc(ctx, logger, nk, function(profile) {
-        var request = parsePayload(payload);
-        var heroId = normalizeId(request.heroId);
+    return runProfileRpc(ctx, logger, nk, function(userId, profile) {
+        const request = parsePayload(payload);
+        const heroId = normalizeId(request.heroId);
         if (!isKnownHero(heroId)) {
             return response(false, "unknown_hero", "Unknown hero selection.", profile);
         }
@@ -263,28 +280,28 @@ function RpcSelectHero(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkr
 }
 
 function RpcUnlockHero(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
-    return runProfileRpc(ctx, logger, nk, function(profile) {
-        var request = parsePayload(payload);
-        var purchase = tryUnlockHero(ctx.userId!, nk, profile, normalizeId(request.heroId));
+    return runProfileRpc(ctx, logger, nk, function(userId, profile) {
+        const request = parsePayload(payload);
+        const purchase = tryUnlockHero(userId, nk, profile, normalizeId(request.heroId));
         return response(purchase.status === PURCHASE_STATUS_SUCCESS, purchaseStatusToCode(purchase.status), purchase.message, profile, purchase, purchase.status === PURCHASE_STATUS_SUCCESS);
     });
 }
 
 function RpcPurchaseOffer(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
-    return runProfileRpc(ctx, logger, nk, function(profile) {
-        var request = parsePayload(payload);
-        var purchase = tryPurchaseOffer(ctx, ctx.userId!, nk, profile, getOfferById(normalizeId(request.offerId)));
+    return runProfileRpc(ctx, logger, nk, function(userId, profile) {
+        const request = parsePayload(payload);
+        const purchase = tryPurchaseOffer(ctx, userId, nk, profile, getOfferById(normalizeId(request.offerId)));
         return response(purchase.status === PURCHASE_STATUS_SUCCESS, purchaseStatusToCode(purchase.status), purchase.message, profile, purchase, purchase.status === PURCHASE_STATUS_SUCCESS);
     });
 }
 
 function RpcApplyRankedResult(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
-    return runProfileRpc(ctx, logger, nk, function(profile) {
-        var request = parsePayload(payload);
-        var performance = buildRankedResultPayload(request, profile);
-        var previousRating = profile.elo;
-        var delta = calculateRankedRatingDelta(performance, previousRating, profile.rankedMatchesPlayed);
-        var newRating = applyRankedRatingDelta(previousRating, delta);
+    return runProfileRpc(ctx, logger, nk, function(userId, profile) {
+        const request = parsePayload(payload);
+        const performance = buildRankedResultPayload(request, profile);
+        const previousRating = profile.elo;
+        const delta = calculateRankedRatingDelta(performance, previousRating, profile.rankedMatchesPlayed);
+        const newRating = applyRankedRatingDelta(previousRating, delta);
 
         profile.elo = newRating;
         profile.rankedMatchesPlayed += 1;
@@ -300,7 +317,7 @@ function RpcApplyRankedResult(ctx: nkruntime.Context, logger: nkruntime.Logger, 
         try {
             nk.leaderboardRecordWrite(
                 RANKED_LEADERBOARD_ID,
-                ctx.userId!,
+                userId,
                 ctx.username || profile.displayName,
                 newRating,
                 profile.peakElo,
@@ -315,7 +332,16 @@ function RpcApplyRankedResult(ctx: nkruntime.Context, logger: nkruntime.Logger, 
             logger.info("Ranked leaderboard write skipped: " + errorToString(error));
         }
 
-        return rankedResponse(true, null, "Ranked result persisted.", profile, previousRating, newRating, delta, true);
+        return rankedResponse({
+            succeeded: true,
+            errorCode: null,
+            message: "Ranked result persisted.",
+            profile: profile,
+            previousRating: previousRating,
+            newRating: newRating,
+            delta: delta,
+            persist: true
+        });
     });
 }
 
@@ -325,10 +351,10 @@ function RpcSubmitMatchTelemetry(ctx: nkruntime.Context, logger: nkruntime.Logge
     }
 
     try {
-        var request = parsePayload(payload);
-        var matchKey = nk.uuidv4().replace(/-/g, "");
-        var timestampUnix = Math.floor(Date.now() / 1000);
-        var telemetry = {
+        const request = parsePayload(payload);
+        const matchKey = nk.uuidv4().replace(/-/g, "");
+        const timestampUnix = Math.floor(Date.now() / 1000);
+        const telemetry = {
             user_id: ctx.userId,
             match_key: matchKey,
             timestamp_unix: timestampUnix,
@@ -373,20 +399,56 @@ function RpcSubmitMatchTelemetry(ctx: nkruntime.Context, logger: nkruntime.Logge
 
 function RpcFinalizeSignedMatchResult(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
     if (!ctx.userId) {
-        return JSON.stringify(signedMatchResultResponse(false, "unauthorized", "Authentication required.", null, 0, 0, 0, null, false, false));
+        return JSON.stringify(signedMatchResultResponse({
+            succeeded: false,
+            errorCode: "unauthorized",
+            message: "Authentication required.",
+            profile: null,
+            previousRating: 0,
+            newRating: 0,
+            delta: 0,
+            matchKey: null,
+            telemetrySaved: false,
+            alreadyProcessed: false,
+            persist: false
+        }));
     }
 
     try {
-        var request = buildSignedMatchResultPayload(parsePayload(payload));
-        var validationError = validateSignedMatchResultPayload(ctx, nk, request);
+        const request = buildSignedMatchResultPayload(parsePayload(payload));
+        const validationError = validateSignedMatchResultPayload(ctx, nk, request);
         if (validationError) {
-            return JSON.stringify(signedMatchResultResponse(false, validationError.code, validationError.message, null, 0, 0, 0, request.matchKey, false, false));
+            return JSON.stringify(signedMatchResultResponse({
+                succeeded: false,
+                errorCode: validationError.code,
+                message: validationError.message,
+                profile: null,
+                previousRating: 0,
+                newRating: 0,
+                delta: 0,
+                matchKey: request.matchKey,
+                telemetrySaved: false,
+                alreadyProcessed: false,
+                persist: false
+            }));
         }
 
-        var loaded = loadOrCreateProfile(ctx, nk);
-        var existingReceipt = readMatchResultReceipt(ctx.userId, request.matchKey, nk);
+        const loaded = loadOrCreateProfile(ctx.userId, ctx.username, nk);
+        const existingReceipt = readMatchResultReceipt(ctx.userId, request.matchKey, nk);
         if (existingReceipt) {
-            return JSON.stringify(signedMatchResultResponse(true, null, "Signed match result already processed.", loaded.profile, existingReceipt.previousRating, existingReceipt.newRating, existingReceipt.delta, existingReceipt.matchKey, existingReceipt.telemetrySaved, true));
+            return JSON.stringify(signedMatchResultResponse({
+                succeeded: true,
+                errorCode: null,
+                message: "Signed match result already processed.",
+                profile: loaded.profile,
+                previousRating: existingReceipt.previousRating,
+                newRating: existingReceipt.newRating,
+                delta: existingReceipt.delta,
+                matchKey: existingReceipt.matchKey,
+                telemetrySaved: existingReceipt.telemetrySaved,
+                alreadyProcessed: true,
+                persist: true
+            }));
         }
 
         let previousRating = loaded.profile.elo;
@@ -394,7 +456,7 @@ function RpcFinalizeSignedMatchResult(ctx: nkruntime.Context, logger: nkruntime.
         let delta = 0;
 
         if (request.gameMode === "ranked") {
-            var performance = signedPayloadToRankedResult(request, loaded.profile);
+            const performance = signedPayloadToRankedResult(request, loaded.profile);
             delta = calculateRankedRatingDelta(performance, previousRating, loaded.profile.rankedMatchesPlayed);
             newRating = applyRankedRatingDelta(previousRating, delta);
 
@@ -429,7 +491,7 @@ function RpcFinalizeSignedMatchResult(ctx: nkruntime.Context, logger: nkruntime.
             }
         }
 
-        var telemetrySaved = writeSignedTelemetry(ctx.userId, nk, request, previousRating, delta);
+        const telemetrySaved = writeSignedTelemetry(ctx.userId, logger, nk, request, previousRating, delta);
         writeProfile(ctx.userId, loaded.profile, loaded.version, nk);
         writeMatchResultReceipt(ctx.userId, request.matchKey, nk, {
             matchKey: request.matchKey,
@@ -440,22 +502,47 @@ function RpcFinalizeSignedMatchResult(ctx: nkruntime.Context, logger: nkruntime.
             processedAtUnix: Math.floor(Date.now() / 1000)
         });
 
-        return JSON.stringify(signedMatchResultResponse(true, null, "Signed match result applied.", loaded.profile, previousRating, newRating, delta, request.matchKey, telemetrySaved, false));
+        return JSON.stringify(signedMatchResultResponse({
+            succeeded: true,
+            errorCode: null,
+            message: "Signed match result applied.",
+            profile: loaded.profile,
+            previousRating: previousRating,
+            newRating: newRating,
+            delta: delta,
+            matchKey: request.matchKey,
+            telemetrySaved: telemetrySaved,
+            alreadyProcessed: false,
+            persist: true
+        }));
     } catch (error) {
         logger.error("Signed match result RPC failed: " + errorToString(error));
-        return JSON.stringify(signedMatchResultResponse(false, "server_error", "Signed match result validation failed.", null, 0, 0, 0, null, false, false));
+        return JSON.stringify(signedMatchResultResponse({
+            succeeded: false,
+            errorCode: "server_error",
+            message: "Signed match result validation failed.",
+            profile: null,
+            previousRating: 0,
+            newRating: 0,
+            delta: 0,
+            matchKey: null,
+            telemetrySaved: false,
+            alreadyProcessed: false,
+            persist: false
+        }));
     }
 }
 
-function runProfileRpc(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, handler: (profile: PlayerProfileData) => any): string {
-    if (!ctx.userId) {
+function runProfileRpc(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, handler: (userId: string, profile: PlayerProfileData) => any): string {
+    const userId = ctx.userId;
+    if (!userId) {
         return JSON.stringify(response(false, "unauthorized", "Authentication required.", null));
     }
     try {
-        var loaded = loadOrCreateProfile(ctx, nk);
-        var result = handler(loaded.profile);
+        const loaded = loadOrCreateProfile(userId, ctx.username, nk);
+        const result = handler(userId, loaded.profile);
         if (result.persist) {
-            writeProfile(ctx.userId, loaded.profile, loaded.version, nk);
+            writeProfile(userId, loaded.profile, loaded.version, nk);
         }
         delete result.persist;
         return JSON.stringify(result);
@@ -465,21 +552,21 @@ function runProfileRpc(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkr
     }
 }
 
-function loadOrCreateProfile(ctx: nkruntime.Context, nk: nkruntime.Nakama) {
-    var objects = nk.storageRead([{ collection: STORAGE_COLLECTION, key: STORAGE_KEY_PROFILE, userId: ctx.userId! }]);
+function loadOrCreateProfile(userId: string, username: string | undefined, nk: nkruntime.Nakama) {
+    const objects = nk.storageRead([{ collection: STORAGE_COLLECTION, key: STORAGE_KEY_PROFILE, userId: userId }]);
     if (objects && objects.length > 0) {
-        var existingProfile = sanitizeProfile(castProfile(objects[0].value));
-        applyWalletStateToProfile(existingProfile, ensureWalletState(ctx.userId!, existingProfile, nk));
+        const existingProfile = sanitizeProfile(castProfile(objects[0].value));
+        applyWalletStateToProfile(existingProfile, ensureWalletState(userId, existingProfile, nk));
         return { profile: existingProfile, version: objects[0].version };
     }
-    var profile = createDefaultProfile(ctx.username || "NewPlayer");
-    applyWalletStateToProfile(profile, ensureWalletState(ctx.userId!, profile, nk));
-    writeProfile(ctx.userId!, profile, null, nk);
+    const profile = createDefaultProfile(username || "NewPlayer");
+    applyWalletStateToProfile(profile, ensureWalletState(userId, profile, nk));
+    writeProfile(userId, profile, null, nk);
     return { profile: profile, version: null };
 }
 
 function writeProfile(userId: string, profile: PlayerProfileData, version: string | null, nk: nkruntime.Nakama): void {
-    var write: nkruntime.StorageWriteRequest = {
+    const write: nkruntime.StorageWriteRequest = {
         collection: STORAGE_COLLECTION,
         key: STORAGE_KEY_PROFILE,
         userId: userId,
@@ -553,9 +640,9 @@ function sanitizeProfile(profile: PlayerProfileData): PlayerProfileData {
     profile.ownedHeroIds = normalizeIds(profile.ownedHeroIds);
     profile.ownedCosmeticIds = normalizeIds(profile.ownedCosmeticIds);
     profile.ownedOfferIds = normalizeIds(profile.ownedOfferIds);
-    for (var i = 0; i < STARTER_HERO_IDS.length; i++) {
-        if (!containsString(profile.ownedHeroIds, STARTER_HERO_IDS[i])) {
-            profile.ownedHeroIds.push(STARTER_HERO_IDS[i]);
+    for (const starterHeroId of STARTER_HERO_IDS) {
+        if (!containsString(profile.ownedHeroIds, starterHeroId)) {
+            profile.ownedHeroIds.push(starterHeroId);
         }
     }
     profile.selectedHero = ownsHero(profile, normalizeId(profile.selectedHero)) ? normalizeId(profile.selectedHero) : resolveDefaultHero(profile);
@@ -569,7 +656,7 @@ function tryUnlockHero(userId: string, nk: nkruntime.Nakama, profile: PlayerProf
     if (ownsHero(profile, heroId)) {
         return purchase(PURCHASE_STATUS_ALREADY_OWNED, "hero_unlock_" + heroId, heroId, "Hero already owned.", CURRENCY_NONE, 0);
     }
-    var walletSpend = spendWalletCurrency(userId, nk, CURRENCY_COMMAND_CREDITS, DEFAULT_HERO_UNLOCK_PRICE, {
+    const walletSpend = spendWalletCurrency(userId, nk, CURRENCY_COMMAND_CREDITS, DEFAULT_HERO_UNLOCK_PRICE, {
         reason: "hero_unlock",
         heroId: heroId
     });
@@ -595,7 +682,7 @@ function tryPurchaseOffer(ctx: nkruntime.Context, userId: string, nk: nkruntime.
     if (ownsOffer(profile, offer)) {
         return purchase(PURCHASE_STATUS_ALREADY_OWNED, offer.offerId, offer.contentId, "Offer already owned.", CURRENCY_NONE, 0);
     }
-    var walletSpend = spendWalletCurrency(userId, nk, offer.priceCurrency, offer.price, {
+    const walletSpend = spendWalletCurrency(userId, nk, offer.priceCurrency, offer.price, {
         reason: "offer_purchase",
         offerId: offer.offerId,
         contentId: offer.contentId
@@ -609,28 +696,30 @@ function tryPurchaseOffer(ctx: nkruntime.Context, userId: string, nk: nkruntime.
 }
 
 function getOfferById(offerId: string): CatalogOffer | null {
-    var offers = getCatalogOffers();
-    for (var i = 0; i < offers.length; i++) {
-        if (normalizeId(offers[i].offerId) === offerId) {
-            return offers[i];
+    const offers = getCatalogOffers();
+    for (const offer of offers) {
+        if (normalizeId(offer.offerId) === offerId) {
+            return offer;
         }
     }
     return null;
 }
 
 function getCatalogOffers(): CatalogOffer[] {
-    var offers: CatalogOffer[] = [];
-    for (var i = 0; i < ALL_HERO_IDS.length; i++) {
-        if (!containsString(STARTER_HERO_IDS, ALL_HERO_IDS[i])) {
-            offers.push({ offerId: "hero_unlock_" + ALL_HERO_IDS[i], displayName: getHeroDisplayName(ALL_HERO_IDS[i]) + " Hero Unlock", offerType: OFFER_TYPE_HERO_UNLOCK, priceCurrency: CURRENCY_COMMAND_CREDITS, price: DEFAULT_HERO_UNLOCK_PRICE, contentId: ALL_HERO_IDS[i], availability: AVAILABILITY_LAUNCH });
+    const offers: CatalogOffer[] = [];
+    for (const heroId of ALL_HERO_IDS) {
+        if (!containsString(STARTER_HERO_IDS, heroId)) {
+            offers.push({ offerId: "hero_unlock_" + heroId, displayName: getHeroDisplayName(heroId) + " Hero Unlock", offerType: OFFER_TYPE_HERO_UNLOCK, priceCurrency: CURRENCY_COMMAND_CREDITS, price: DEFAULT_HERO_UNLOCK_PRICE, contentId: heroId, availability: AVAILABILITY_LAUNCH });
         }
     }
-    offers.push({ offerId: "launch_weaponskin_vandal_firstlight", displayName: "Firstlight Vandal", offerType: OFFER_TYPE_WEAPON_SKIN, priceCurrency: CURRENCY_ZCORE, price: 900, contentId: "weaponskin_vandal_firstlight", availability: AVAILABILITY_LAUNCH });
-    offers.push({ offerId: "launch_playercard_founders_signal", displayName: "Founder's Signal Card", offerType: OFFER_TYPE_PLAYER_CARD, priceCurrency: CURRENCY_ZCORE, price: 250, contentId: "playercard_founders_signal", availability: AVAILABILITY_LAUNCH });
-    offers.push({ offerId: "launch_spray_hold_the_site", displayName: "Hold The Site Spray", offerType: OFFER_TYPE_SPRAY, priceCurrency: CURRENCY_ZCORE, price: 175, contentId: "spray_hold_the_site", availability: AVAILABILITY_LAUNCH });
-    offers.push({ offerId: "launch_charm_quantum_key", displayName: "Quantum Key Charm", offerType: OFFER_TYPE_CHARM, priceCurrency: CURRENCY_ZCORE, price: 225, contentId: "charm_quantum_key", availability: AVAILABILITY_LAUNCH });
-    offers.push({ offerId: "alpha_founder_pack", displayName: "Alpha Founder Pack", offerType: OFFER_TYPE_ALPHA_FOUNDER_PACK, priceCurrency: CURRENCY_ZCORE, price: 1800, contentId: "alpha_founder_pack", availability: AVAILABILITY_ALPHA_ONLY });
-    offers.push({ offerId: "season2_battlepass_premium", displayName: "Season 2 Battle Pass", offerType: OFFER_TYPE_BATTLE_PASS, priceCurrency: CURRENCY_ZCORE, price: 1000, contentId: "season2_battlepass_premium", availability: AVAILABILITY_SEASON2 });
+    offers.push(
+        { offerId: "launch_weaponskin_vandal_firstlight", displayName: "Firstlight Vandal", offerType: OFFER_TYPE_WEAPON_SKIN, priceCurrency: CURRENCY_ZCORE, price: 900, contentId: "weaponskin_vandal_firstlight", availability: AVAILABILITY_LAUNCH },
+        { offerId: "launch_playercard_founders_signal", displayName: "Founder's Signal Card", offerType: OFFER_TYPE_PLAYER_CARD, priceCurrency: CURRENCY_ZCORE, price: 250, contentId: "playercard_founders_signal", availability: AVAILABILITY_LAUNCH },
+        { offerId: "launch_spray_hold_the_site", displayName: "Hold The Site Spray", offerType: OFFER_TYPE_SPRAY, priceCurrency: CURRENCY_ZCORE, price: 175, contentId: "spray_hold_the_site", availability: AVAILABILITY_LAUNCH },
+        { offerId: "launch_charm_quantum_key", displayName: "Quantum Key Charm", offerType: OFFER_TYPE_CHARM, priceCurrency: CURRENCY_ZCORE, price: 225, contentId: "charm_quantum_key", availability: AVAILABILITY_LAUNCH },
+        { offerId: "alpha_founder_pack", displayName: "Alpha Founder Pack", offerType: OFFER_TYPE_ALPHA_FOUNDER_PACK, priceCurrency: CURRENCY_ZCORE, price: 1800, contentId: "alpha_founder_pack", availability: AVAILABILITY_ALPHA_ONLY },
+        { offerId: "season2_battlepass_premium", displayName: "Season 2 Battle Pass", offerType: OFFER_TYPE_BATTLE_PASS, priceCurrency: CURRENCY_ZCORE, price: 1000, contentId: "season2_battlepass_premium", availability: AVAILABILITY_SEASON2 }
+    );
     return offers;
 }
 
@@ -667,16 +756,16 @@ function spendWalletCurrency(userId: string, nk: nkruntime.Nakama, currencyType:
         return { succeeded: true, wallet: readWalletState(userId, nk) };
     }
 
-    var walletKey = getWalletId(currencyType);
+    const walletKey = getWalletId(currencyType);
     if (!walletKey) {
         return { succeeded: false, wallet: readWalletState(userId, nk) };
     }
 
-    var changeset: {[key: string]: number} = {};
+    const changeset: {[key: string]: number} = {};
     changeset[walletKey] = -Math.abs(amount);
 
     try {
-        var walletResult = nk.walletUpdate(userId, changeset, metadata || {}, true);
+        const walletResult = nk.walletUpdate(userId, changeset, metadata || {}, true);
         return { succeeded: true, wallet: walletStateFromRaw(walletResult.updated) };
     } catch (error) {
         return { succeeded: false, wallet: readWalletState(userId, nk), error: errorToString(error) };
@@ -687,16 +776,16 @@ function response(succeeded: boolean, errorCode: string | null, message: string,
     return { succeeded: succeeded, errorCode: errorCode, message: message, profile: profile, purchase: purchaseResult || null, persist: !!persist };
 }
 
-function rankedResponse(succeeded: boolean, errorCode: string | null, message: string, profile: PlayerProfileData | null, previousRating: number, newRating: number, delta: number, persist: boolean) {
+function rankedResponse(payload: RankedResponsePayload) {
     return {
-        succeeded: succeeded,
-        errorCode: errorCode,
-        message: message,
-        profile: profile,
-        previousRating: previousRating,
-        newRating: newRating,
-        delta: delta,
-        persist: persist
+        succeeded: payload.succeeded,
+        errorCode: payload.errorCode,
+        message: payload.message,
+        profile: payload.profile,
+        previousRating: payload.previousRating,
+        newRating: payload.newRating,
+        delta: payload.delta,
+        persist: payload.persist
     };
 }
 
@@ -709,28 +798,18 @@ function telemetryResponse(succeeded: boolean, errorCode: string | null, message
     };
 }
 
-function signedMatchResultResponse(
-    succeeded: boolean,
-    errorCode: string | null,
-    message: string,
-    profile: PlayerProfileData | null,
-    previousRating: number,
-    newRating: number,
-    delta: number,
-    matchKey: string | null,
-    telemetrySaved: boolean,
-    alreadyProcessed: boolean) {
+function signedMatchResultResponse(payload: SignedMatchResultResponsePayload) {
     return {
-        succeeded: succeeded,
-        errorCode: errorCode,
-        message: message,
-        profile: profile,
-        previousRating: previousRating,
-        newRating: newRating,
-        delta: delta,
-        matchKey: matchKey,
-        telemetrySaved: telemetrySaved,
-        alreadyProcessed: alreadyProcessed
+        succeeded: payload.succeeded,
+        errorCode: payload.errorCode,
+        message: payload.message,
+        profile: payload.profile,
+        previousRating: payload.previousRating,
+        newRating: payload.newRating,
+        delta: payload.delta,
+        matchKey: payload.matchKey,
+        telemetrySaved: payload.telemetrySaved,
+        alreadyProcessed: payload.alreadyProcessed
     };
 }
 
@@ -795,12 +874,12 @@ function validateSignedMatchResultPayload(ctx: nkruntime.Context, nk: nkruntime.
         return { code: "backend_misconfigured", message: "Signed match result secret is not configured." };
     }
 
-    var nowUnix = Math.floor(Date.now() / 1000);
+    const nowUnix = Math.floor(Date.now() / 1000);
     if (payload.issuedAtUnix <= 0 || Math.abs(nowUnix - payload.issuedAtUnix) > MATCH_RESULT_MAX_AGE_SECONDS) {
         return { code: "expired_signature", message: "Signed match result payload expired." };
     }
 
-    var expectedSignature = computeSignedMatchResultSignature(ctx, nk, payload);
+    const expectedSignature = computeSignedMatchResultSignature(ctx, nk, payload);
     if (expectedSignature !== payload.signature) {
         return { code: "invalid_signature", message: "Signed match result signature mismatch." };
     }
@@ -845,20 +924,20 @@ function resolveMatchResultSecret(ctx: nkruntime.Context): string {
 }
 
 function arrayBufferToHex(buffer: ArrayBuffer): string {
-    var bytes = new Uint8Array(buffer);
-    var out = "";
-    for (var i = 0; i < bytes.length; i++) {
-        var hex = bytes[i].toString(16);
+    const bytes = new Uint8Array(buffer);
+    let out = "";
+    bytes.forEach((byte) => {
+        const hex = byte.toString(16);
         out += hex.length === 1 ? "0" + hex : hex;
-    }
+    });
     return out;
 }
 
 function signedPayloadToRankedResult(payload: SignedMatchResultPayload, profile: PlayerProfileData): RankedResultPayload {
-    var attackerRoundsWon = clampMin(readNumber(payload.attackerRoundsWon, 0), 0);
-    var defenderRoundsWon = clampMin(readNumber(payload.defenderRoundsWon, 0), 0);
-    var highScore = attackerRoundsWon > defenderRoundsWon ? attackerRoundsWon : defenderRoundsWon;
-    var lowScore = attackerRoundsWon > defenderRoundsWon ? defenderRoundsWon : attackerRoundsWon;
+    const attackerRoundsWon = clampMin(readNumber(payload.attackerRoundsWon, 0), 0);
+    const defenderRoundsWon = clampMin(readNumber(payload.defenderRoundsWon, 0), 0);
+    const highScore = Math.max(attackerRoundsWon, defenderRoundsWon);
+    const lowScore = Math.min(attackerRoundsWon, defenderRoundsWon);
 
     return {
         opponentAverageRating: clampMin(readNumber(profile.elo, MINIMUM_RATING), MINIMUM_RATING),
@@ -872,7 +951,7 @@ function signedPayloadToRankedResult(payload: SignedMatchResultPayload, profile:
     };
 }
 
-function writeSignedTelemetry(userId: string, nk: nkruntime.Nakama, payload: SignedMatchResultPayload, eloBefore: number, eloDelta: number): boolean {
+function writeSignedTelemetry(userId: string, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: SignedMatchResultPayload, eloBefore: number, eloDelta: number): boolean {
     try {
         nk.storageWrite([{
             collection: TELEMETRY_COLLECTION,
@@ -909,12 +988,13 @@ function writeSignedTelemetry(userId: string, nk: nkruntime.Nakama, payload: Sig
         }]);
         return true;
     } catch (error) {
+        logger.info("Signed telemetry write skipped: " + errorToString(error));
         return false;
     }
 }
 
 function readMatchResultReceipt(userId: string, matchKey: string, nk: nkruntime.Nakama): MatchResultReceipt | null {
-    var objects = nk.storageRead([{ collection: MATCH_RESULT_RECEIPTS_COLLECTION, key: matchKey, userId: userId }]);
+    const objects = nk.storageRead([{ collection: MATCH_RESULT_RECEIPTS_COLLECTION, key: matchKey, userId: userId }]);
     if (!objects || objects.length === 0) {
         return null;
     }
@@ -945,29 +1025,33 @@ function castMatchResultReceipt(raw: {[key: string]: any}): MatchResultReceipt {
 }
 
 function resolveDefaultHero(profile: PlayerProfileData): string {
-    for (var i = 0; i < STARTER_HERO_IDS.length; i++) if (containsString(profile.ownedHeroIds, STARTER_HERO_IDS[i])) return STARTER_HERO_IDS[i];
+    for (const starterHeroId of STARTER_HERO_IDS) {
+        if (containsString(profile.ownedHeroIds, starterHeroId)) {
+            return starterHeroId;
+        }
+    }
     return profile.ownedHeroIds.length > 0 ? profile.ownedHeroIds[0] : STARTER_HERO_IDS[0];
 }
 
 function ensureWalletState(userId: string, profile: PlayerProfileData, nk: nkruntime.Nakama): WalletState {
-    var account = nk.accountGetId(userId);
-    var rawWallet = account && account.wallet ? account.wallet : {};
+    const account = nk.accountGetId(userId);
+    const rawWallet = account?.wallet ?? {};
 
-    var hasCommandCredits = hasWalletId(rawWallet, WALLET_ID_COMMAND_CREDITS);
-    var hasZCore = hasWalletId(rawWallet, WALLET_ID_ZCORE);
+    const hasCommandCredits = hasWalletId(rawWallet, WALLET_ID_COMMAND_CREDITS);
+    const hasZCore = hasWalletId(rawWallet, WALLET_ID_ZCORE);
     if (hasCommandCredits && hasZCore) {
         return walletStateFromRaw(rawWallet);
     }
 
-    var bootstrapChanges: {[key: string]: number} = {};
+    const bootstrapChanges: {[key: string]: number} = {};
     if (!hasCommandCredits) {
-        var desiredCommandCredits = clampMin(readNumber(profile.commandCredits, STARTING_COMMAND_CREDITS), 0);
+        const desiredCommandCredits = clampMin(readNumber(profile.commandCredits, STARTING_COMMAND_CREDITS), 0);
         if (desiredCommandCredits !== 0) {
             bootstrapChanges[WALLET_ID_COMMAND_CREDITS] = desiredCommandCredits;
         }
     }
     if (!hasZCore) {
-        var desiredZCore = clampMin(readNumber(profile.zCore, STARTING_ZCORE), 0);
+        const desiredZCore = clampMin(readNumber(profile.zCore, STARTING_ZCORE), 0);
         if (desiredZCore !== 0) {
             bootstrapChanges[WALLET_ID_ZCORE] = desiredZCore;
         }
@@ -977,13 +1061,13 @@ function ensureWalletState(userId: string, profile: PlayerProfileData, nk: nkrun
         return walletStateFromRaw(rawWallet);
     }
 
-    var walletResult = nk.walletUpdate(userId, bootstrapChanges, { reason: "wallet_bootstrap" }, false);
+    const walletResult = nk.walletUpdate(userId, bootstrapChanges, { reason: "wallet_bootstrap" }, false);
     return walletStateFromRaw(walletResult.updated);
 }
 
 function readWalletState(userId: string, nk: nkruntime.Nakama): WalletState {
-    var account = nk.accountGetId(userId);
-    return walletStateFromRaw(account && account.wallet ? account.wallet : {});
+    const account = nk.accountGetId(userId);
+    return walletStateFromRaw(account?.wallet ?? {});
 }
 
 function applyWalletStateToProfile(profile: PlayerProfileData, wallet: WalletState): void {
@@ -1023,24 +1107,24 @@ function buildRankedResultPayload(raw: any, profile: PlayerProfileData): RankedR
 }
 
 function calculateRankedRatingDelta(performance: RankedResultPayload, playerRating: number, rankedMatchesPlayed: number): number {
-    var safePlayerRating = clampMin(readNumber(playerRating, MINIMUM_RATING), MINIMUM_RATING);
-    var safeOpponentRating = performance.opponentAverageRating > 0
+    const safePlayerRating = clampMin(readNumber(playerRating, MINIMUM_RATING), MINIMUM_RATING);
+    const safeOpponentRating = performance.opponentAverageRating > 0
         ? clampMin(performance.opponentAverageRating, MINIMUM_RATING)
         : safePlayerRating;
 
-    var expectedScore = 1 / (1 + Math.pow(10, (safeOpponentRating - safePlayerRating) / 400));
-    var actualScore = performance.won ? 1 : 0;
-    var kFactor = getRankedKFactor(safePlayerRating, rankedMatchesPlayed);
-    var baseDelta = Math.round(kFactor * (actualScore - expectedScore));
-    var performanceBonus = calculatePerformanceBonus(performance);
-    var delta = baseDelta + performanceBonus;
+    const expectedScore = 1 / (1 + Math.pow(10, (safeOpponentRating - safePlayerRating) / 400));
+    const actualScore = performance.won ? 1 : 0;
+    const kFactor = getRankedKFactor(safePlayerRating, rankedMatchesPlayed);
+    const baseDelta = Math.round(kFactor * (actualScore - expectedScore));
+    const performanceBonus = calculatePerformanceBonus(performance);
+    const delta = baseDelta + performanceBonus;
 
     if (performance.won) {
-        var maxGain = rankedMatchesPlayed < PLACEMENT_MATCHES ? 48 : 38;
+        const maxGain = rankedMatchesPlayed < PLACEMENT_MATCHES ? 48 : 38;
         return clamp(delta, 10, maxGain);
     }
 
-    var maxLoss = rankedMatchesPlayed < PLACEMENT_MATCHES ? -34 : -28;
+    const maxLoss = rankedMatchesPlayed < PLACEMENT_MATCHES ? -34 : -28;
     return clamp(delta, maxLoss, 0);
 }
 
@@ -1058,25 +1142,25 @@ function getRankedKFactor(rating: number, rankedMatchesPlayed: number): number {
 }
 
 function calculatePerformanceBonus(performance: RankedResultPayload): number {
-    var roundsPlayed = Math.max(1, performance.roundsWon + performance.roundsLost);
-    var contribution = performance.kills + (performance.assists * 0.65);
-    var expectedContribution = Math.max(3, roundsPlayed * 0.45);
-    var contributionOffset = clamp(
+    const roundsPlayed = Math.max(1, performance.roundsWon + performance.roundsLost);
+    const contribution = performance.kills + (performance.assists * 0.65);
+    const expectedContribution = Math.max(3, roundsPlayed * 0.45);
+    const contributionOffset = clamp(
         (contribution - expectedContribution) / Math.max(4, roundsPlayed * 0.35),
         -1,
         1);
 
-    var survivalScore = performance.deaths <= 0
+    const survivalScore = performance.deaths <= 0
         ? 1
         : clamp((performance.kills + (performance.assists * 0.5)) / performance.deaths, 0, 2);
 
-    var roundMomentum = clamp((performance.roundsWon - performance.roundsLost) / roundsPlayed, -1, 1);
-    var rawBonus = (contributionOffset * 4)
+    const roundMomentum = clamp((performance.roundsWon - performance.roundsLost) / roundsPlayed, -1, 1);
+    const rawBonus = (contributionOffset * 4)
         + ((survivalScore - 0.5) * 4)
         + (roundMomentum * 3)
         + (performance.wasMvp ? 2 : 0);
 
-    var bonus = Math.round(rawBonus);
+    let bonus = Math.round(rawBonus);
     if (!performance.won) {
         bonus = Math.min(bonus, 2);
     }
@@ -1090,12 +1174,38 @@ function getHeroDisplayName(heroId: string): string { return HERO_DISPLAY_NAMES[
 function parsePayload(payload: string): any { return payload ? JSON.parse(payload) : {}; }
 function normalizeId(value: any): string { return typeof value === "string" ? value.trim().toLowerCase() : ""; }
 function stringifyValue(value: any, fallback: string): string { return typeof value === "string" && value.length > 0 ? value : fallback; }
-function readNumber(value: any, fallback: number): number { var parsed = Number(value); return isNaN(parsed) ? fallback : parsed; }
-function clampMin(value: number, minimum: number): number { return value < minimum ? minimum : value; }
-function clamp(value: number, minimum: number, maximum: number): number { return value < minimum ? minimum : (value > maximum ? maximum : value); }
+function readNumber(value: any, fallback: number): number {
+    const parsed = Number(value);
+    return parsed !== parsed ? fallback : parsed;
+}
+function clampMin(value: number, minimum: number): number { return Math.max(value, minimum); }
+function clamp(value: number, minimum: number, maximum: number): number { return Math.min(Math.max(value, minimum), maximum); }
 function errorToString(error: unknown): string { return error instanceof Error ? error.message : String(error); }
-function containsString(source: string[], value: string): boolean { for (var i = 0; i < source.length; i++) if (source[i] === value) return true; return false; }
-function normalizeIds(values: any): string[] { var src = Array.isArray(values) ? values : []; var out: string[] = []; for (var i = 0; i < src.length; i++) { var id = normalizeId(src[i]); if (id && !containsString(out, id)) out.push(id); } return out; }
-function readStringEnv(ctx: nkruntime.Context, key: string, fallback: string): string { return ctx.env && ctx.env[key] ? ctx.env[key] : fallback; }
+function containsString(source: string[], value: string): boolean {
+    for (const sourceValue of source) {
+        if (sourceValue === value) {
+            return true;
+        }
+    }
+    return false;
+}
+function normalizeIds(values: any): string[] {
+    const src = Array.isArray(values) ? values : [];
+    const out: string[] = [];
+    for (const value of src) {
+        const id = normalizeId(value);
+        if (id && !containsString(out, id)) {
+            out.push(id);
+        }
+    }
+    return out;
+}
+function readStringEnv(ctx: nkruntime.Context, key: string, fallback: string): string {
+    const value = ctx.env?.[key];
+    return value ? value : fallback;
+}
 function readNumberEnv(ctx: nkruntime.Context, key: string, fallback: number): number { return readNumber(readStringEnv(ctx, key, String(fallback)), fallback); }
-function readBoolEnv(ctx: nkruntime.Context, key: string, fallback: boolean): boolean { var value = readStringEnv(ctx, key, fallback ? "true" : "false").toLowerCase(); return value === "1" || value === "true" || value === "yes" || value === "on"; }
+function readBoolEnv(ctx: nkruntime.Context, key: string, fallback: boolean): boolean {
+    const value = readStringEnv(ctx, key, fallback ? "true" : "false").toLowerCase();
+    return value === "1" || value === "true" || value === "yes" || value === "on";
+}

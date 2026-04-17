@@ -16,7 +16,7 @@ namespace ProjectZ.Network
     }
 
     [Serializable]
-    public class MatchTelemetryData
+    public class HeatmapTelemetryData
     {
         public string matchId;
         public string date;
@@ -29,7 +29,7 @@ namespace ProjectZ.Network
     /// </summary>
     public class TelemetryLogger : NetworkBehaviour
     {
-        private MatchTelemetryData _currentData;
+        private HeatmapTelemetryData _currentData;
         private bool _isRecording = false;
 
         public override void OnStartServer()
@@ -49,7 +49,7 @@ namespace ProjectZ.Network
 
         private void StartRecording()
         {
-            _currentData = new MatchTelemetryData
+            _currentData = new HeatmapTelemetryData
             {
                 matchId = Guid.NewGuid().ToString(),
                 date = DateTime.UtcNow.ToString("o")

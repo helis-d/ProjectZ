@@ -133,7 +133,7 @@ public:
 	}
 
 	int store(const void *data, size_t data_size) const {
-		mkdir(dbname, 0777);
+		mkdir(dbname, 0700);
 
 		if (FILE *f = fopen(filename.c_str(), "w")) {
 			size_t written_bytes = fwrite(data, 1, data_size, f);
