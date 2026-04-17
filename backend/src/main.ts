@@ -1176,9 +1176,12 @@ function getHeroDisplayName(heroId: string): string { return HERO_DISPLAY_NAMES[
 function parsePayload(payload: string): any { return payload ? JSON.parse(payload) : {}; }
 function normalizeId(value: any): string { return typeof value === "string" ? value.trim().toLowerCase() : ""; }
 function stringifyValue(value: any, fallback: string): string { return typeof value === "string" && value.length > 0 ? value : fallback; }
+function isFiniteNumber(value: number): boolean {
+    return value === value && value !== Number.POSITIVE_INFINITY && value !== Number.NEGATIVE_INFINITY;
+}
 function readNumber(value: any, fallback: number): number {
     const parsed = Number(value);
-    if (!isFinite(parsed)) {
+    if (!isFiniteNumber(parsed)) {
         return fallback;
     }
 
