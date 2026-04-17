@@ -1,3 +1,4 @@
+using ProjectZ.Audio;
 using ProjectZ.Weapon;
 using System.Collections;
 using UnityEngine;
@@ -17,6 +18,13 @@ public abstract class BaseWeapon : MonoBehaviour
     protected bool isFiring = false;
     protected float nextFireTime = 0f;
 
+    // [FIX] BUG-14: cached once in Awake — Camera.main is FindObjectOfType internally
+    private Camera _firingCamera;
+    // [FIX] BUG-15: stored ref so we stop only this coroutine, not all
+    private Coroutine _reloadCoroutine;
+    // [FIX] BUG-13: cached audio source for priority routing
+    private AudioSource _cachedAudio;
+
     // Animator hash'leri (performans için)
     protected static readonly int AnimShoot = Animator.StringToHash("Shoot");
     protected static readonly int AnimReload = Animator.StringToHash("Reload");
@@ -33,6 +41,10 @@ public abstract class BaseWeapon : MonoBehaviour
     protected virtual void Awake()
     {
         currentAmmo = data != null ? data.magazineSize : 0;
+        // [FIX] BUG-14: cache camera once — avoids FindObjectOfType every shot
+        _firingCamera = Camera.main ?? GetComponentInParent<Camera>();
+        // [FIX] BUG-13: cache AudioSource for priority-routed playback
+        _cachedAudio = GetComponent<AudioSource>();
     }
 
     // ─── Temel API ───────────────────────────────────────────────
@@ -66,7 +78,7 @@ public abstract class BaseWeapon : MonoBehaviour
     {
         if (data == null) return;
         if (isReloading || currentAmmo == data.magazineSize) return;
-        StartCoroutine(ReloadCoroutine());
+        _reloadCoroutine = StartCoroutine(ReloadCoroutine()); // [FIX] BUG-15: store ref
     }
 
     public virtual void Draw()
@@ -79,7 +91,12 @@ public abstract class BaseWeapon : MonoBehaviour
 
     public virtual void Holster()
     {
-        StopAllCoroutines();
+        // [FIX] BUG-15: stop only the reload coroutine, not ALL coroutines
+        if (_reloadCoroutine != null)
+        {
+            StopCoroutine(_reloadCoroutine);
+            _reloadCoroutine = null;
+        }
         isReloading = false;
         weaponAnimator?.SetTrigger(AnimHolster);
     }
@@ -158,9 +175,9 @@ public abstract class BaseWeapon : MonoBehaviour
 
     protected bool TryBuildFireRay(Vector3 spread, out Ray ray)
     {
-        Camera firingCamera = Camera.main;
-        if (firingCamera == null)
-            firingCamera = GetComponentInParent<Camera>();
+        // [FIX] BUG-14: use cached camera — no FindObjectOfType per shot
+        Camera firingCamera = _firingCamera;
+        if (firingCamera == null) firingCamera = Camera.main; // runtime fallback only
 
         if (firingCamera != null)
         {
@@ -194,8 +211,12 @@ public abstract class BaseWeapon : MonoBehaviour
 
     protected void PlaySound(AudioClip clip)
     {
-        if (clip && TryGetComponent<AudioSource>(out var src))
-            src.PlayOneShot(clip);
+        if (clip == null || _cachedAudio == null) return;
+        // [FIX] BUG-13: route through AudioPriorityManager, never call AudioSource.Play directly
+        if (AudioPriorityManager.Instance != null)
+            AudioPriorityManager.Instance.PlaySound(_cachedAudio, clip, AudioPriorityManager.AudioChannel.Combat);
+        else
+            _cachedAudio.PlayOneShot(clip); // editor/offline fallback only
     }
 
     public virtual void InitializeRuntimeData(WeaponData runtimeData)

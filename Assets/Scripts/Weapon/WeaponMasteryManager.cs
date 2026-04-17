@@ -152,12 +152,22 @@ namespace ProjectZ.Weapon
             if (_killsPerRound.Count > 3)
                 _killsPerRound.Dequeue();
 
-            if (_killsPerRound.Count >= 3 && _killsPerRound.All(k => k == 0))
+            // [FIX] BUG-20: no LINQ in hot path — manual loop, zero allocations
+            if (_killsPerRound.Count >= 3)
             {
-                foreach (WeaponRuntimeData data in _weaponData.Values)
-                    data.AddXP(MasteryXPTable.GetXP(MasteryEventType.DeathColdStreak));
+                bool allZero = true;
+                foreach (int k in _killsPerRound)
+                {
+                    if (k != 0) { allZero = false; break; }
+                }
 
-                Debug.Log("[Mastery] Cold streak triggered. -60 XP applied.");
+                if (allZero)
+                {
+                    foreach (WeaponRuntimeData data in _weaponData.Values)
+                        data.AddXP(MasteryXPTable.GetXP(MasteryEventType.DeathColdStreak));
+
+                    Debug.Log("[Mastery] Cold streak triggered. -60 XP applied.");
+                }
             }
         }
 

@@ -33,7 +33,7 @@ namespace ProjectZ.Hero.Jielda
             Team ownerTeam = tm.GetTeam(OwnerConnectionId);
             List<int> targets = new List<int>();
 
-            // Find enemies that have been damaged (using DamageAssistRegistry concept)
+            // Find enemies that have taken body damage this round (GDD requirement)
             foreach (var client in ServerManager.Clients.Values)
             {
                 if (client.FirstObject == null) continue;
@@ -43,14 +43,15 @@ namespace ProjectZ.Hero.Jielda
 
                 if (targetTeam == ownerTeam || targetTeam == Team.None) continue;
 
-                PlayerHealth health = client.FirstObject.GetComponent<PlayerHealth>();
-                if (health == null || health.IsDead.Value) continue;
-
-                // Prioritize damaged enemies (not full HP)
-                if (health.CurrentHealth.Value < health.MaxHealth)
-                    targets.Insert(0, targetId); // damaged first
-                else
-                    targets.Add(targetId);
+                // [FIX] BUG-17: Targeting logic now strict to "body damage this round"
+                if (DamageAssistRegistry.BodyDamageVictimsThisRound.Contains(targetId))
+                {
+                    PlayerHealth health = client.FirstObject.GetComponent<PlayerHealth>();
+                    if (health != null && !health.IsDead.Value)
+                    {
+                        targets.Add(targetId);
+                    }
+                }
 
                 if (targets.Count >= _maxTargets) break;
             }

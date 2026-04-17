@@ -79,6 +79,18 @@ namespace ProjectZ.Player
             CurrentHealth.Value = Mathf.Clamp(CurrentHealth.Value + amount, 0f, _maxHealth);
         }
 
+        /// <summary>
+        /// Adds HP that can exceed MaxHealth up to overhealCeiling.
+        /// Used exclusively by BloodPact (GDD: "+50hp per kill with overheal").
+        /// </summary>
+        [Server]
+        public void AddHealthOverheal(float amount, float overhealCeiling) // [FIX] BUG-18
+        {
+            if (IsDead.Value) return;
+            float ceiling = Mathf.Max(_maxHealth, overhealCeiling);
+            CurrentHealth.Value = Mathf.Clamp(CurrentHealth.Value + amount, 0f, ceiling);
+        }
+
         [Server]
         public void ResetHealth()
         {

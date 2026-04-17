@@ -1,0 +1,36 @@
+name: SonarCloud Quality Analysis
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+jobs:
+  sonarcloud-scan:
+    name: 🔍 Code Quality & Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # SonarCloud tam branch geçmişine ihtiyaç duyar (relevancy issues)
+
+      - name: Run SonarQube / SonarCloud Scanner
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          # C# için genel statik metin tarama analizi ayarları. (Unity spesifik .sln gereksinimini pas geçer)
+          args: >
+            -Dsonar.projectKey=helis-d_ProjectZ
+            -Dsonar.organization=helis-d
+            -Dsonar.sources=Assets/Scripts
+            -Dsonar.csharp.analyze_test_dirs=false
+            -Dsonar.exclusions=Assets/Plugins/**,Packages/**,ProjectSettings/**
+            -Dsonar.cpd.exclusions=Assets/Plugins/**

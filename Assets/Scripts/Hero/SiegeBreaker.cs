@@ -73,6 +73,8 @@ namespace ProjectZ.Hero.Jacob
 
         private void HandleRoundEnd(Team winner, int roundNumber)
         {
+            if (!IsServerInitialized) return; // [FIX] BUG-05: only server despawns
+
             if (_activeZone == null) return;
 
             _roundsRemaining--;
@@ -95,11 +97,19 @@ namespace ProjectZ.Hero.Jacob
     /// </summary>
     public class SiegeBreakerZone : MonoBehaviour
     {
-        /// <summary>Returns true if a ray passes through any active SiegeBreakerZone.</summary>
+        // [FIX] BUG-25: Static registry instead of FindObjectsByType in hot path
+        private static readonly System.Collections.Generic.HashSet<SiegeBreakerZone> _activeZones
+            = new System.Collections.Generic.HashSet<SiegeBreakerZone>();
+
+        private void OnEnable()  => _activeZones.Add(this);
+        private void OnDisable() => _activeZones.Remove(this);
+
+        /// <summary>Returns true if a point falls inside any active SiegeBreakerZone.</summary>
         public static bool IsPointInSiegeZone(Vector3 point)
         {
-            foreach (var zone in FindObjectsByType<SiegeBreakerZone>(FindObjectsSortMode.None))
+            foreach (SiegeBreakerZone zone in _activeZones)
             {
+                if (zone == null) continue;
                 Collider col = zone.GetComponent<Collider>();
                 if (col != null && col.bounds.Contains(point))
                     return true;

@@ -32,6 +32,9 @@ namespace ProjectZ.Core
         /// <summary>Fired when a player dies. Args: victim connection id, killer connection id.</summary>
         public static event Action<int, int> OnPlayerDeath;
 
+        /// <summary>Fired when a player is damaged. Args: victim connection id, attacker connection id, damage amount.</summary>
+        public static event Action<int, int, float> OnPlayerDamaged;
+
         /// <summary>Fired when a player spawns. Arg: connection id.</summary>
         public static event Action<int> OnPlayerSpawned;
 
@@ -67,6 +70,7 @@ namespace ProjectZ.Core
         public static void InvokeMatchEnd(Team winner)          => OnMatchEnd?.Invoke(winner);
 
         public static void InvokePlayerDeath(int victimId, int killerId) => OnPlayerDeath?.Invoke(victimId, killerId);
+        public static void InvokePlayerDamaged(int victim, int attacker, float damage) => OnPlayerDamaged?.Invoke(victim, attacker, damage);
         public static void InvokePlayerSpawned(int connId)      => OnPlayerSpawned?.Invoke(connId);
         public static void InvokePlayerConnected(int connId)    => OnPlayerConnected?.Invoke(connId);
         public static void InvokePlayerDisconnected(int connId) => OnPlayerDisconnected?.Invoke(connId);

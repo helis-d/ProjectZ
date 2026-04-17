@@ -25,6 +25,12 @@ namespace ProjectZ.Weapon
 
         private int _currentLevel = 1;
         private static readonly int EmissionColor = Shader.PropertyToID("_EmissionColor");
+        private MaterialPropertyBlock _propertyBlock; // [FIX] BUG-10: reusable block, zero GC
+
+        private void Awake()
+        {
+            _propertyBlock = new MaterialPropertyBlock(); // [FIX] BUG-10: allocate once
+        }
 
         /// <summary>Call when weapon mastery level changes.</summary>
         public void SetMasteryLevel(int level)
@@ -81,11 +87,11 @@ namespace ProjectZ.Weapon
         private void SetEmissionIntensity(float intensity)
         {
             if (_weaponRenderer == null) return;
-            var mats = _weaponRenderer.materials;
-            if (_emissionMaterialIndex >= mats.Length) return;
-
+            // [FIX] BUG-10: MaterialPropertyBlock — no Material[] allocation
+            _weaponRenderer.GetPropertyBlock(_propertyBlock, _emissionMaterialIndex);
             Color levelColor = MasteryLevelColors.GetColor(_currentLevel);
-            mats[_emissionMaterialIndex].SetColor(EmissionColor, levelColor * intensity);
+            _propertyBlock.SetColor(EmissionColor, levelColor * intensity);
+            _weaponRenderer.SetPropertyBlock(_propertyBlock, _emissionMaterialIndex);
         }
     }
 }

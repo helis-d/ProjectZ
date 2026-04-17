@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace ProjectZ.Combat
@@ -35,6 +35,9 @@ namespace ProjectZ.Combat
         private const float RAY_MARCH_STEP = 0.02f;
         private const float RAY_MARCH_MAX = 1.0f;
 
+        // [FIX] BUG-11: pre-allocated buffer — no GC alloc per shot
+        private readonly System.Collections.Generic.List<Vector3> _penetrationBuffer = new(8);
+
         /// <summary>
         /// Fire a hitscan ray from the given origin in the given direction.
         /// Returns a full trace result including wallbang data.
@@ -43,6 +46,8 @@ namespace ProjectZ.Combat
         {
             direction = direction.normalized;
 
+            _penetrationBuffer.Clear(); // [FIX] BUG-11: reuse, don't allocate
+
             HitscanResult result = new HitscanResult
             {
                 DidHitPlayer = false,
@@ -50,7 +55,7 @@ namespace ProjectZ.Combat
                 WallsPenetrated = 0,
                 FinalHitPoint = origin,
                 TargetObject = null,
-                PenetrationPoints = new List<Vector3>()
+                PenetrationPoints = _penetrationBuffer // [FIX] BUG-11: reference the field
             };
 
             Vector3 currentOrigin = origin;

@@ -59,9 +59,13 @@ namespace ProjectZ.Settings.UI
             
             if (_mainMenuPanel != null) _mainMenuPanel.SetActive(false);
             
-            // Assuming player is still actively playing and not in the main menu lobby
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            // [FIX] BUG-09: Unconditional cursor lock
+            // Only lock cursor if we're actually in the gameplay scene
+            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "SampleScene")
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
         }
 
         // ─── Tab Navigation Callbacks (Linked to UI Buttons) ───────────────

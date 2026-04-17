@@ -4,6 +4,7 @@ using FishNet.Managing.Timing; // NATIVE FISHNET TIMELINE
 using ProjectZ.Combat;
 using ProjectZ.UI;
 using ProjectZ.Weapon;
+using ProjectZ.Core;
 using ProjectZ.Core.Interfaces;
 using UnityEngine;
 
@@ -32,9 +33,13 @@ namespace ProjectZ.Player
         private BaseWeapon _currentBoundWeapon; 
 
         // ─── ANTI-CHEAT SUNUCU DENETLEYİCİLERİ ───────────────────────────
+        private const float MaxAcceptedOriginDesync = 3f;
+        private const float MaxAcceptedAimAngleDegrees = 75f;
+        private const float MaxRollbackWindowSeconds = 1.25f;
         private uint _lastServerFireTick;
-        private System.Collections.Generic.Dictionary<int, int> _serverAmmoTracker = new();
-        private System.Collections.Generic.HashSet<int> _reloadingWeapons = new();
+        // [FIX] BUG-29: initialized in Awake, not field declaration
+        private System.Collections.Generic.Dictionary<int, int> _serverAmmoTracker;
+        private System.Collections.Generic.HashSet<int> _reloadingWeapons;
 
         // SERVER SİSTEMİ İÇİN (BloodPact vb. yetenekler dinleyecek)
         public event System.Action OnServerFired;
@@ -47,7 +52,11 @@ namespace ProjectZ.Player
 
             _hitscanShooter = GetComponent<HitscanShooter>();
             _damageProcessor = GetComponent<DamageProcessor>();
-            _weaponManager = PlayerWeaponRuntimeBootstrap.EnsureWeaponRig(gameObject, GetComponent<WeaponManager>()); 
+            _weaponManager = PlayerWeaponRuntimeBootstrap.EnsureWeaponRig(gameObject, GetComponent<WeaponManager>());
+
+            // [FIX] BUG-29: initialize collections in Awake per architecture rule
+            _serverAmmoTracker = new System.Collections.Generic.Dictionary<int, int>();
+            _reloadingWeapons  = new System.Collections.Generic.HashSet<int>();
         }
 
         public override void OnStartClient()
@@ -57,7 +66,8 @@ namespace ProjectZ.Player
             if (!IsOwner)
                 enabled = false;
 
-            _crosshair = FindFirstObjectByType<CrosshairUI>();
+            // [FIX] BUG-22: no FindObjectOfType at runtime — use ServiceLocator
+            _crosshair = ServiceLocator.Get<CrosshairUI>();
         }
 
         public override void OnStartNetwork()

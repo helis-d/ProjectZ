@@ -34,7 +34,7 @@ namespace ProjectZ.Hero.Zauhll
             // Make invisible to enemies
             RpcSetInvisible(true, _visionRange);
 
-            GameEvents.OnPlayerDeath += HandleFirstKill;
+            GameEvents.OnPlayerDamaged += HandleFirstHit; // [FIX] BUG-16: 100% lifesteal on first HIT, not kill
             StartCoroutine(VoidWalkRoutine());
             Debug.Log("[VoidWalk] Activated! Invisible.");
         }
@@ -46,9 +46,9 @@ namespace ProjectZ.Hero.Zauhll
             Deactivate();
         }
 
-        private void HandleFirstKill(int victimId, int killerId)
+        private void HandleFirstHit(int victimId, int attackerId, float damage) // [FIX] BUG-16: Uses damage dealt
         {
-            if (!_isActive || _firstHitUsed || killerId != OwnerConnectionId) return;
+            if (!_isActive || _firstHitUsed || attackerId != OwnerConnectionId) return;
 
             _firstHitUsed = true;
 
@@ -56,8 +56,8 @@ namespace ProjectZ.Hero.Zauhll
             PlayerHealth health = GetOwnerComponent<PlayerHealth>();
             if (health != null)
             {
-                health.AddHealth(50f); // Approximate lifesteal
-                Debug.Log("[VoidWalk] First kill lifesteal applied!");
+                health.AddHealth(damage); // 100% lifesteal
+                Debug.Log($"[VoidWalk] First hit lifesteal applied! +{damage:F0} HP");
             }
         }
 
@@ -72,7 +72,7 @@ namespace ProjectZ.Hero.Zauhll
         {
             if (!_isActive) return;
             _isActive = false;
-            GameEvents.OnPlayerDeath -= HandleFirstKill;
+            GameEvents.OnPlayerDamaged -= HandleFirstHit;
             RpcSetInvisible(false, 0f);
             Debug.Log("[VoidWalk] Deactivated.");
         }
@@ -109,7 +109,7 @@ namespace ProjectZ.Hero.Zauhll
 
         private void OnDestroy()
         {
-            if (_isActive) GameEvents.OnPlayerDeath -= HandleFirstKill;
+            if (_isActive) GameEvents.OnPlayerDamaged -= HandleFirstHit;
         }
     }
 }

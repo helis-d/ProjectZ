@@ -140,7 +140,11 @@ namespace ProjectZ.Player
         }
 
         [ServerRpc]
-        private void RequestDropWeapon(int slot)
+        private void RequestDropWeapon(int slot) => DropWeaponInternal(slot);
+
+        // [FIX] BUG-23: Server logic separated from ServerRpc to prevent server calling Rpc directly
+        [Server]
+        private void DropWeaponInternal(int slot)
         {
             if (_weaponPickupPrefab == null)
             {
@@ -199,7 +203,7 @@ namespace ProjectZ.Player
             if (targetSlot == 1)
             {
                 if (!string.IsNullOrEmpty(_primaryWeaponId.Value))
-                    RequestDropWeapon(1);
+                    DropWeaponInternal(1); // [FIX] BUG-23
 
                 _primaryWeaponId.Value = data.weaponId;
                 _primaryRuntime = runtime ?? new WeaponRuntimeData { WeaponID = data.weaponId };
@@ -208,7 +212,7 @@ namespace ProjectZ.Player
             else
             {
                 if (!string.IsNullOrEmpty(_secondaryWeaponId.Value))
-                    RequestDropWeapon(2);
+                    DropWeaponInternal(2); // [FIX] BUG-23
 
                 _secondaryWeaponId.Value = data.weaponId;
                 _secondaryRuntime = runtime ?? new WeaponRuntimeData { WeaponID = data.weaponId };

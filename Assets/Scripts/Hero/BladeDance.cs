@@ -1,5 +1,6 @@
 using System.Collections;
 using FishNet.Object;
+using ProjectZ.Combat;
 using ProjectZ.Player;
 using UnityEngine;
 
@@ -23,6 +24,9 @@ namespace ProjectZ.Hero.Sai
 
         private int _currentStrike;
         private bool _isActive;
+        private DamageProcessor _damageProcessor;
+        // [FIX] BUG-12: pre-allocated buffer — OverlapSphere allocates per strike
+        private readonly Collider[] _overlapBuffer = new Collider[32];
 
         [Server]
         public override void Activate()
@@ -31,6 +35,7 @@ namespace ProjectZ.Hero.Sai
 
             _currentStrike = 0;
             _isActive = true;
+            _damageProcessor = GetOwnerComponent<DamageProcessor>();
             StartCoroutine(BladeDanceRoutine());
             Debug.Log("[BladeDance] Activated!");
         }
@@ -59,19 +64,22 @@ namespace ProjectZ.Hero.Sai
         [Server]
         private void ExecuteStrike12()
         {
-            // Cone/sphere damage in front of player
-            Collider[] hits = Physics.OverlapSphere(CasterTransform.position, _strike12Range, ResolveLayerMask(_playerLayer));
-            foreach (Collider hit in hits)
+            // [FIX] BUG-12: NonAlloc variant — reuse pre-allocated buffer
+            int count = Physics.OverlapSphereNonAlloc(CasterTransform.position, _strike12Range, _overlapBuffer, ResolveLayerMask(_playerLayer));
+            for (int i = 0; i < count; i++)
             {
-                // Only hit enemies in front hemisphere
+                Collider hit = _overlapBuffer[i];
                 Vector3 toTarget = (hit.transform.position - CasterTransform.position).normalized;
                 if (Vector3.Dot(CasterTransform.forward, toTarget) < 0.3f) continue;
 
                 PlayerHealth health = hit.GetComponentInParent<PlayerHealth>();
                 if (health != null && !health.IsDead.Value && health.OwnerId != OwnerConnectionId)
                 {
-                    health.TakeDamage(_strike12Damage, OwnerConnectionId);
-                    Debug.Log($"[BladeDance] Strike {_currentStrike} hit player {health.OwnerId} for {_strike12Damage}");
+                    if (_damageProcessor != null)
+                    {
+                        _damageProcessor.ProcessAbilityDamage(OwnerConnectionId, _strike12Damage, health, "ultimate_blade_dance");
+                        Debug.Log($"[BladeDance] Strike {_currentStrike} hit player {health.OwnerId} for {_strike12Damage}");
+                    }
                 }
             }
         }
@@ -79,24 +87,21 @@ namespace ProjectZ.Hero.Sai
         [Server]
         private void ExecuteStrike3()
         {
-            // Extended range + root
-            Collider[] hits = Physics.OverlapSphere(CasterTransform.position, _strike3Range, ResolveLayerMask(_playerLayer));
-            foreach (Collider hit in hits)
+            // [FIX] BUG-12: NonAlloc — reuse pre-allocated buffer
+            int count = Physics.OverlapSphereNonAlloc(CasterTransform.position, _strike3Range, _overlapBuffer, ResolveLayerMask(_playerLayer));
+            for (int i = 0; i < count; i++)
             {
+                Collider hit = _overlapBuffer[i];
                 Vector3 toTarget = (hit.transform.position - CasterTransform.position).normalized;
                 if (Vector3.Dot(CasterTransform.forward, toTarget) < 0.2f) continue;
 
                 PlayerHealth health = hit.GetComponentInParent<PlayerHealth>();
                 if (health != null && !health.IsDead.Value && health.OwnerId != OwnerConnectionId)
                 {
-                    // Root: disable movement for duration
                     var nob = hit.GetComponentInParent<FishNet.Object.NetworkObject>();
                     if (nob != null && nob.Owner.IsValid)
-                    {
                         RpcApplyRoot(nob.Owner, nob.gameObject, _rootDuration);
-                    }
 
-                    // Reveal position via outline
                     var outline = hit.GetComponentInParent<OutlineController>();
                     if (outline != null && OwnerController != null)
                         outline.TargetShowOutline(OwnerController.Owner, _rootDuration);

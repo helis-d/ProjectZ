@@ -59,8 +59,12 @@ namespace ProjectZ.Combat
 
             // Record damage for assist tracking
             DamageAssistRegistry.RecordDamage(shooterConnId, victimConnId, finalDamage);
+            if (!isHeadshot && !targetHealth.IsDead.Value)
+                DamageAssistRegistry.BodyDamageVictimsThisRound.Add(victimConnId); // [FIX] BUG-17
 
             targetHealth.TakeDamage(finalDamage, shooterConnId);
+            GameEvents.InvokePlayerDamaged(victimConnId, shooterConnId, finalDamage); // [FIX] BUG-16
+
             bool isKill = targetHealth.IsDead.Value;
 
             WeaponMasteryManager shooterMastery = GetPlayerMastery(shooterConnId);
@@ -84,8 +88,51 @@ namespace ProjectZ.Combat
             BroadcastHitInfo(shooterConnId, zone, isHeadshot, isWallbang, finalDamage);
         }
 
+        public void ProcessAbilityDamage(int attackerConnId, float damage, PlayerHealth targetHealth, string damageSourceId)
+        {
+            if (!IsServerInitialized || targetHealth == null || targetHealth.IsDead.Value || damage <= 0f)
+                return;
+
+            int victimConnId = targetHealth.OwnerId;
+            if (attackerConnId >= 0)
+            {
+                DamageAssistRegistry.RecordDamage(attackerConnId, victimConnId, damage);
+                DamageAssistRegistry.BodyDamageVictimsThisRound.Add(victimConnId); // Using abilities counts as body damage for SpiritWolves
+            }
+
+            targetHealth.TakeDamage(damage, attackerConnId);
+            GameEvents.InvokePlayerDamaged(victimConnId, attackerConnId, damage); // [FIX] BUG-16
+
+            bool isKill = targetHealth.IsDead.Value;
+
+            if (isKill)
+            {
+                ProcessVictimDeath(victimConnId, false);
+
+                if (attackerConnId >= 0)
+                {
+                    DamageAssistRegistry.ResolveAssists(victimConnId, attackerConnId);
+                    string sourceId = string.IsNullOrEmpty(damageSourceId) ? "ability" : damageSourceId;
+                    GameEvents.InvokeKillDetails(attackerConnId, victimConnId, sourceId, false, false);
+                }
+                else
+                {
+                    DamageAssistRegistry.ClearVictim(victimConnId);
+                }
+            }
+
+            BroadcastHitInfo(attackerConnId, HitboxZone.UpperChest, false, false, damage);
+        }
+
+        public void ProcessEnvironmentalDamage(float damage, PlayerHealth targetHealth, string damageSourceId = "environment")
+        {
+            ProcessAbilityDamage(-1, damage, targetHealth, damageSourceId);
+        }
+
         public void ProcessVictimDeath(int victimConnId, bool killedByHeadshot)
         {
+            if (!IsServerInitialized) return; // [FIX] BUG-02: prevent client invocation
+
             WeaponMasteryManager victimMastery = GetPlayerMastery(victimConnId);
             if (victimMastery == null)
                 return;
@@ -94,7 +141,11 @@ namespace ProjectZ.Combat
                 return;
 
             WeaponManager wm = conn.FirstObject.GetComponent<WeaponManager>();
-            if (wm == null) return;
+            if (wm == null)
+            {
+                Debug.LogWarning($"[DamageProcessor] BUG-21: WeaponManager null for victim {victimConnId}. Death XP penalty skipped."); // [FIX] BUG-21
+                return;
+            }
             
             BaseWeapon victimWeapon = wm.GetActiveWeapon();
             if (victimWeapon == null || victimWeapon.data == null)

@@ -1,5 +1,6 @@
 using System.Collections;
 using FishNet.Object;
+using ProjectZ.Combat;
 using ProjectZ.GameMode;
 using ProjectZ.Player;
 using UnityEngine;
@@ -21,6 +22,9 @@ namespace ProjectZ.Hero.Sector
         [SerializeField] private float _outerRadius = 8.0f;
         [SerializeField] private GameObject _chargePrefab;
         [SerializeField] private LayerMask _playerLayer;
+
+        // [FIX] BUG-12: pre-allocated buffer — OverlapSphere allocs a new Collider[] per call
+        private readonly Collider[] _overlapBuffer = new Collider[64];
 
         [Server]
         public override void Activate()
@@ -72,11 +76,13 @@ namespace ProjectZ.Hero.Sector
         [Server]
         private void ApplyExplosionDamage(Vector3 center)
         {
-            Collider[] hits = Physics.OverlapSphere(center, _outerRadius, ResolveLayerMask(_playerLayer));
+            // [FIX] BUG-12: NonAlloc variant — reuse pre-allocated buffer
+            int hitCount = Physics.OverlapSphereNonAlloc(center, _outerRadius, _overlapBuffer, ResolveLayerMask(_playerLayer));
             TeamManager tm = TeamManager.Instance;
 
-            foreach (Collider hit in hits)
+            for (int i = 0; i < hitCount; i++)
             {
+                Collider hit = _overlapBuffer[i];
                 PlayerHealth health = hit.GetComponentInParent<PlayerHealth>();
                 if (health == null || health.IsDead.Value) continue;
 
@@ -94,8 +100,12 @@ namespace ProjectZ.Hero.Sector
                 if (cc != null && cc.height < 1.5f) // crouching
                     damage *= 0.5f;
 
-                health.TakeDamage(damage, OwnerConnectionId);
-                Debug.Log($"[DoomsdayCharge] {health.OwnerId} took {damage:F0} dmg (dist: {dist:F1}m)");
+                DamageProcessor damageProcessor = health.GetComponent<DamageProcessor>();
+                if (damageProcessor != null)
+                {
+                    damageProcessor.ProcessAbilityDamage(OwnerConnectionId, damage, health, "ultimate_doomsday_charge");
+                    Debug.Log($"[DoomsdayCharge] {health.OwnerId} took {damage:F0} dmg (dist: {dist:F1}m)");
+                }
             }
 
             RpcPlayExplosionEffect(center);

@@ -20,30 +20,32 @@ namespace ProjectZ.Settings.UI
         [SerializeField] private Toggle _vSyncToggle;
 
         private Resolution[] _systemResolutions;
+        private readonly System.Collections.Generic.List<string> _resolutionOptions = new(); // [FIX] BUG-27: class field, cleared not re-allocated
 
         private void OnEnable()
         {
             if (SettingsManager.Instance == null) return;
-            var data = SettingsManager.Instance.Current.graphics;
 
-            PopulateResolutions(data);
+            PopulateResolutions();
 
             if (_fullscreenToggle != null)
             {
-                _fullscreenToggle.isOn = data.fullScreen;
-                _fullscreenToggle.onValueChanged.AddListener(val => data.fullScreen = val);
+                _fullscreenToggle.isOn = SettingsManager.Instance.Current.graphics.fullScreen;
+                // [FIX] BUG-08: capture manager ref, not struct copy — mutations reach the real object
+                _fullscreenToggle.onValueChanged.AddListener(val =>
+                    SettingsManager.Instance.Current.graphics.fullScreen = val);
             }
 
             if (_vSyncToggle != null)
             {
-                _vSyncToggle.isOn = data.vSync > 0;
-                _vSyncToggle.onValueChanged.AddListener(val => data.vSync = val ? 1 : 0);
+                _vSyncToggle.isOn = SettingsManager.Instance.Current.graphics.vSync > 0;
+                _vSyncToggle.onValueChanged.AddListener(val => // [FIX] BUG-08
+                    SettingsManager.Instance.Current.graphics.vSync = val ? 1 : 0);
             }
 
             if (_fpsLimitDropdown != null)
             {
-                // Simple hardcoded mapping for the example: 0=60, 1=120, 2=144, 3=240, 4=Uncapped(-1)
-                _fpsLimitDropdown.value = MapFpsToIndex(data.fpsLimit);
+                _fpsLimitDropdown.value = MapFpsToIndex(SettingsManager.Instance.Current.graphics.fpsLimit);
                 _fpsLimitDropdown.onValueChanged.AddListener(OnFpsChanged);
             }
         }
@@ -56,7 +58,7 @@ namespace ProjectZ.Settings.UI
             if (_fpsLimitDropdown != null) _fpsLimitDropdown.onValueChanged.RemoveAllListeners();
         }
 
-        private void PopulateResolutions(GraphicsSettings data)
+        private void PopulateResolutions()
         {
             if (_resolutionDropdown == null) return;
 
@@ -64,26 +66,29 @@ namespace ProjectZ.Settings.UI
             _resolutionDropdown.ClearOptions();
 
             int currentResIndex = 0;
-            List<string> options = new List<string>();
+            _resolutionOptions.Clear(); // [FIX] BUG-27: reuse field, no allocation
+            int savedIndex = SettingsManager.Instance.Current.graphics.resolutionIndex;
 
             for (int i = 0; i < _systemResolutions.Length; i++)
             {
                 string option = $"{_systemResolutions[i].width} x {_systemResolutions[i].height} @ {_systemResolutions[i].refreshRateRatio.value:F0}Hz";
-                options.Add(option);
+                _resolutionOptions.Add(option);
 
                 // If saved index matches OR we match current screen W/H in first setup
-                if (data.resolutionIndex == i || 
-                    (data.resolutionIndex == -1 && _systemResolutions[i].width == Screen.width && _systemResolutions[i].height == Screen.height))
+                if (savedIndex == i ||
+                    (savedIndex == -1 && _systemResolutions[i].width == Screen.width && _systemResolutions[i].height == Screen.height))
                 {
                     currentResIndex = i;
                 }
             }
 
-            _resolutionDropdown.AddOptions(options);
+            _resolutionDropdown.AddOptions(_resolutionOptions);
             _resolutionDropdown.value = currentResIndex;
             _resolutionDropdown.RefreshShownValue();
 
-            _resolutionDropdown.onValueChanged.AddListener(idx => data.resolutionIndex = idx);
+            // [FIX] BUG-08: capture manager directly, not a struct copy
+            _resolutionDropdown.onValueChanged.AddListener(idx =>
+                SettingsManager.Instance.Current.graphics.resolutionIndex = idx);
         }
 
         private void OnFpsChanged(int index)

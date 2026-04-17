@@ -174,21 +174,45 @@ namespace ProjectZ.Player
         // ─── Server RPCs ──────────────────────────────────────────────────
 
         [ServerRpc]
-        private void CmdStartPlant(string siteId) => _sphereManager.TryStartPlant(OwnerId, siteId);
+        private void CmdStartPlant(string siteId)
+        {
+            if (_sphereManager != null)
+                _sphereManager.TryStartPlant(OwnerId, siteId);
+        }
 
         [ServerRpc]
-        private void CmdCancelPlant() => _sphereManager.CancelPlant();
+        private void CmdCancelPlant()
+        {
+            if (_sphereManager != null)
+                _sphereManager.CancelPlant(OwnerId);
+        }
 
         [ServerRpc]
-        private void CmdConfirmPlant(string siteId, Vector3 pos) => _sphereManager.ConfirmPlant(siteId, pos);
+        private void CmdConfirmPlant(string siteId, Vector3 pos)
+        {
+            if (_sphereManager != null)
+                _sphereManager.ConfirmPlant(OwnerId, siteId, pos);
+        }
 
         [ServerRpc]
-        private void CmdStartDefuse() => _sphereManager.TryStartDefuse(OwnerId);
+        private void CmdStartDefuse()
+        {
+            if (_sphereManager != null)
+                _sphereManager.TryStartDefuse(OwnerId);
+        }
 
         [ServerRpc]
-        private void CmdCancelDefuse() => _sphereManager.CancelDefuse();
+        private void CmdCancelDefuse()
+        {
+            if (_sphereManager != null)
+                _sphereManager.CancelDefuse(OwnerId);
+        }
 
         [ServerRpc]
-        private void CmdConfirmDefuse() => _sphereManager.ConfirmDefuse();
+        private void CmdConfirmDefuse()
+        {
+            if (_sphereManager != null)
+                _sphereManager.ConfirmDefuse(OwnerId);
+        }
     }
 }

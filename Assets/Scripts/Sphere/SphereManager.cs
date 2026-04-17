@@ -1,5 +1,6 @@
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
+using ProjectZ.Combat;
 using ProjectZ.Core;
 using ProjectZ.GameMode;
 using ProjectZ.Player;
@@ -94,9 +95,9 @@ namespace ProjectZ.Sphere
         }
 
         [Server]
-        public void CancelPlant()
+        public void CancelPlant(int connId)
         {
-            if (CurrentState.Value == SphereState.Planting)
+            if (CurrentState.Value == SphereState.Planting && _activePlanterId == connId)
             {
                 CurrentState.Value = SphereState.Idle;
                 _activePlanterId = -1;
@@ -104,17 +105,17 @@ namespace ProjectZ.Sphere
         }
 
         [Server]
-        public void ConfirmPlant(string siteId, Vector3 position)
+        public void ConfirmPlant(int connId, string siteId, Vector3 position)
         {
             if (CurrentState.Value != SphereState.Planting)
                 return;
 
-            if (_activePlanterId < 0)
+            if (_activePlanterId < 0 || _activePlanterId != connId)
                 return;
 
             if (!IsValidSite(siteId) || !IsPlayerNearSite(_activePlanterId, siteId))
             {
-                CancelPlant();
+                CancelPlant(connId);
                 return;
             }
 
@@ -152,9 +153,9 @@ namespace ProjectZ.Sphere
         }
 
         [Server]
-        public void CancelDefuse()
+        public void CancelDefuse(int connId)
         {
-            if (CurrentState.Value == SphereState.Defusing)
+            if (CurrentState.Value == SphereState.Defusing && _activeDefuserId == connId)
             {
                 CurrentState.Value = SphereState.Active;
                 _activeDefuserId = -1;
@@ -163,21 +164,21 @@ namespace ProjectZ.Sphere
         }
 
         [Server]
-        public void ConfirmDefuse()
+        public void ConfirmDefuse(int connId)
         {
             if (CurrentState.Value != SphereState.Defusing)
                 return;
 
-            if (_activeDefuserId < 0 || !IsPlayerNearSphere(_activeDefuserId))
+            if (_activeDefuserId < 0 || _activeDefuserId != connId || !IsPlayerNearSphere(_activeDefuserId))
             {
-                CancelDefuse();
+                CancelDefuse(connId);
                 return;
             }
 
             float required = GetDefuseTime(_defuseUsedKit);
             if (Time.time < _defuseStartTime + required - 0.08f)
             {
-                CancelDefuse();
+                CancelDefuse(connId);
                 return;
             }
 
@@ -209,7 +210,11 @@ namespace ProjectZ.Sphere
             {
                 ProjectZ.Player.PlayerHealth health = col.GetComponentInParent<ProjectZ.Player.PlayerHealth>();
                 if (health != null)
-                    health.TakeDamage(9999f, -1);
+                {
+                    DamageProcessor damageProcessor = health.GetComponent<DamageProcessor>();
+                    if (damageProcessor != null)
+                        damageProcessor.ProcessEnvironmentalDamage(9999f, health, "sphere_detonation");
+                }
             }
 
             GameEvents.InvokeSphereDetonated();
@@ -292,4 +297,3 @@ namespace ProjectZ.Sphere
         public float GetDefuseTime(bool hasKit) => hasKit ? _defuseTimeKit : _defuseTime;
     }
 }
-

@@ -29,5 +29,10 @@ namespace ProjectZ.Network
             Instance = this;
             DontDestroyOnLoad(gameObject);
         }
+
+        private void OnDestroy() // [FIX] BUG-07: clear stale singleton on destruction
+        {
+            if (Instance == this) Instance = null;
+        }
     }
 }

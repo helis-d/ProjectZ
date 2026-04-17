@@ -47,8 +47,8 @@ namespace ProjectZ.Hero.Kant
             // If Kant got a kill and his ultimate charge is ready
             if (killerId == OwnerController.OwnerId && OwnerController.IsUltimateReady)
             {
-                var clients = FishNet.Managing.NetworkManager.Instances[0].ClientManager.Clients;
-                if (clients.TryGetValue(victimId, out var victimConn))
+                // [FIX] BUG-19: use NetworkBehaviour.ServerManager — never index NetworkManager.Instances[]
+                if (ServerManager.Clients.TryGetValue(victimId, out var victimConn))
                 {
                     if (victimConn.FirstObject != null)
                     {

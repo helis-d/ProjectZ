@@ -13,6 +13,9 @@ namespace ProjectZ.Combat
         // victimId -> (attackerId -> totalDamage)
         private static readonly Dictionary<int, Dictionary<int, float>> _damageMap = new();
 
+        // [FIX] BUG-17: track players who took body damage this round for SpiritWolves
+        public static readonly HashSet<int> BodyDamageVictimsThisRound = new();
+
         /// <summary>Record damage dealt by an attacker to a victim.</summary>
         public static void RecordDamage(int attackerId, int victimId, float damage)
         {
@@ -58,6 +61,7 @@ namespace ProjectZ.Combat
         public static void ClearAll()
         {
             _damageMap.Clear();
+            BodyDamageVictimsThisRound.Clear(); // [FIX] BUG-17: clear on round start
         }
 
         /// <summary>Clear records for a specific victim (e.g. on respawn).</summary>

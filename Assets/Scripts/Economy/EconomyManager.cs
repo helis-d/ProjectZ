@@ -44,21 +44,24 @@ namespace ProjectZ.Economy
             
             if (mode is RankedGameMode ranked)
             {
+                // [FIX] BUG-06: Set raw BASE values; multiplier below is always applied once.
                 _maxMoney            = 9000;
-                _killReward          = (int)RankedGameMode.KillReward;
-                _roundWinReward      = (int)RankedGameMode.RoundWinReward;
-                _roundLossBaseReward = (int)RankedGameMode.RoundLossReward;
-                _sphereReward        = (int)RankedGameMode.SphereReward;
-                _econMultiplier      = 1.0f;
+                _killReward          = (int)RankedGameMode.KillReward;          // 200
+                _roundWinReward      = (int)RankedGameMode.RoundWinReward;      // 3000
+                _roundLossBaseReward = (int)RankedGameMode.RoundLossReward;     // 1900
+                _sphereReward        = (int)RankedGameMode.SphereReward;        // 300
+                _econMultiplier      = 1.0f;                                     // no scaling
             }
             else if (mode is FastFightMode fast)
             {
+                // [FIX] BUG-06: Base values are GDD-spec PRE-multiplier (same as Ranked).
+                // _econMultiplier will scale them to FastFight amounts exactly once below.
                 _maxMoney            = 12000;
-                _killReward          = 200;
-                _roundWinReward      = 3000;
-                _roundLossBaseReward = 1900;
-                _sphereReward        = 300;
-                _econMultiplier      = 1.5f; // GDD: 1.5x Multiplier
+                _killReward          = 200;    // base — x1.5 = 300  (GDD Fast Fight)
+                _roundWinReward      = 3000;   // base — x1.5 = 4500 (GDD Fast Fight)
+                _roundLossBaseReward = 1900;   // base — x1.5 = 2850 (GDD Fast Fight)
+                _sphereReward        = 300;    // base — x1.5 = 450  (GDD Fast Fight)
+                _econMultiplier      = 1.5f;   // GDD: 1.5x Multiplier
             }
             else
             {

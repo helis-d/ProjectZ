@@ -175,9 +175,9 @@ namespace ProjectZ.Player
             // 1. Determine Target Speed
             bool isCrouching = _currentHeight < _standHeight - 0.1f;
             float targetSpeed;
-            if (isCrouching)          targetSpeed = CrouchSpeed;
-            else if (md.WantsToSprint)targetSpeed = WalkSpeed; // Normal is sprint, shift is walk
-            else                      targetSpeed = SprintSpeed;
+            if (isCrouching)           targetSpeed = CrouchSpeed;  // [FIX] BUG-01: crouch unchanged
+            else if (md.WantsToSprint) targetSpeed = SprintSpeed;  // [FIX] BUG-01: sprint = fast
+            else                       targetSpeed = WalkSpeed;    // [FIX] BUG-01: default = walk
 
             float speed = targetSpeed * 0.01f;
             CurrentSpeed = speed;

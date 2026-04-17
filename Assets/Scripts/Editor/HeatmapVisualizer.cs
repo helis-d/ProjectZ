@@ -8,7 +8,7 @@ namespace ProjectZ.EditorTools
 {
     public class HeatmapVisualizer : EditorWindow
     {
-        private MatchTelemetryData _data;
+        private HeatmapTelemetryData _data;
         private bool _isVisualizing = false;
 
         [MenuItem("Tools/ProjectZ/Show Heatmap")]
@@ -47,7 +47,7 @@ namespace ProjectZ.EditorTools
             if (File.Exists(filePath))
             {
                 string json = File.ReadAllText(filePath);
-                _data = JsonUtility.FromJson<MatchTelemetryData>(json);
+                _data = JsonUtility.FromJson<HeatmapTelemetryData>(json);
                 Debug.Log($"[HeatmapVisualizer] Loaded {_data.killEvents.Count} kill events.");
             }
             else

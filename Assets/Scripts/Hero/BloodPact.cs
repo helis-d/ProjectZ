@@ -44,10 +44,14 @@ namespace ProjectZ.Hero.Samuel
 
         private void HandleWeaponFired()
         {
-            if (_isActive && _ownerHealth != null)
+            if (!_isActive) return;
+            if (_ownerHealth == null) return;
+            if (_ownerHealth.IsDead.Value) // [FIX] BUG-03: stop self-damage loop after death
             {
-                _ownerHealth.TakeDamage(_hpCostPerShot, -1); // Self-damage, no killer
+                Deactivate();
+                return;
             }
+            _ownerHealth.TakeDamage(_hpCostPerShot, -1); // Self-damage, no killer
         }
 
         private void Update()
@@ -79,9 +83,9 @@ namespace ProjectZ.Hero.Samuel
 
             if (_ownerHealth != null)
             {
-                // Overheal possible — add HP beyond max
-                _ownerHealth.AddHealth(_hpPerKill);
-                Debug.Log($"[BloodPact] Kill! +{_hpPerKill} HP (current: {_ownerHealth.CurrentHealth})");
+                // [FIX] BUG-18: use AddHealthOverheal so we can exceed MaxHealth (GDD: overheal possible)
+                _ownerHealth.AddHealthOverheal(_hpPerKill, _ownerHealth.MaxHealth + _hpPerKill);
+                Debug.Log($"[BloodPact] Kill! +{_hpPerKill} HP overheal (current: {_ownerHealth.CurrentHealth.Value})");
             }
         }
 

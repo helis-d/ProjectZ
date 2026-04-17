@@ -23,15 +23,14 @@ namespace ProjectZ.Hero.Volt
 
             ProjectZ.Core.Team myTeam = tm.GetTeam(OwnerController.OwnerId);
 
-            // Find all connected clients that are not on my team
-            foreach (var client in FishNet.Managing.NetworkManager.Instances[0].ClientManager.Clients.Values)
+            // [FIX] BUG-19: use NetworkBehaviour.ServerManager — never index NetworkManager.Instances[]
+            foreach (var client in ServerManager.Clients.Values)
             {
                 if (client.FirstObject == null) continue;
 
                 ProjectZ.Core.Team targetTeam = tm.GetTeam(client.ClientId);
                 if (targetTeam != myTeam && targetTeam != ProjectZ.Core.Team.None)
                 {
-                    // Target is an enemy. Send them the blackout RPC.
                     TargetApplyBlackout(client, _duration);
                 }
             }

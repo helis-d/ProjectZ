@@ -18,27 +18,31 @@ namespace ProjectZ.Settings.UI
         private void OnEnable()
         {
             if (SettingsManager.Instance == null) return;
-            var data = SettingsManager.Instance.Current.audio;
 
+            // [FIX] same struct-capture bug as BUG-08: capture manager, not a struct copy
             if (_masterSlider != null)
             {
-                _masterSlider.value = data.masterVolume;
-                _masterSlider.onValueChanged.AddListener(val => data.masterVolume = val);
+                _masterSlider.value = SettingsManager.Instance.Current.audio.masterVolume;
+                _masterSlider.onValueChanged.AddListener(val =>
+                    SettingsManager.Instance.Current.audio.masterVolume = val);
             }
             if (_musicSlider != null)
             {
-                _musicSlider.value = data.musicVolume;
-                _musicSlider.onValueChanged.AddListener(val => data.musicVolume = val);
+                _musicSlider.value = SettingsManager.Instance.Current.audio.musicVolume;
+                _musicSlider.onValueChanged.AddListener(val =>
+                    SettingsManager.Instance.Current.audio.musicVolume = val);
             }
             if (_sfxSlider != null)
             {
-                _sfxSlider.value = data.sfxVolume;
-                _sfxSlider.onValueChanged.AddListener(val => data.sfxVolume = val);
+                _sfxSlider.value = SettingsManager.Instance.Current.audio.sfxVolume;
+                _sfxSlider.onValueChanged.AddListener(val =>
+                    SettingsManager.Instance.Current.audio.sfxVolume = val);
             }
             if (_voiceChatSlider != null)
             {
-                _voiceChatSlider.value = data.voiceChatVolume;
-                _voiceChatSlider.onValueChanged.AddListener(val => data.voiceChatVolume = val);
+                _voiceChatSlider.value = SettingsManager.Instance.Current.audio.voiceChatVolume;
+                _voiceChatSlider.onValueChanged.AddListener(val =>
+                    SettingsManager.Instance.Current.audio.voiceChatVolume = val);
             }
         }
 

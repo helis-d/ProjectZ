@@ -1,5 +1,6 @@
 using System.Collections;
 using FishNet.Object;
+using ProjectZ.Combat;
 using ProjectZ.Player;
 using UnityEngine;
 
@@ -42,7 +43,9 @@ namespace ProjectZ.Hero.Marcus
                 if (targetHealth != null && !targetHealth.IsDead.Value && targetHealth.OwnerId != OwnerConnectionId)
                 {
                     // Hit an enemy
-                    targetHealth.TakeDamage(_enemyDamage, OwnerConnectionId);
+                    DamageProcessor damageProcessor = targetHealth.GetComponent<DamageProcessor>();
+                    if (damageProcessor != null)
+                        damageProcessor.ProcessAbilityDamage(OwnerConnectionId, _enemyDamage, targetHealth, "ultimate_grapple_strike");
 
                     var targetNob = hit.collider.GetComponentInParent<FishNet.Object.NetworkObject>();
                     if (targetNob != null && targetNob.Owner.IsValid)
@@ -72,25 +75,23 @@ namespace ProjectZ.Hero.Marcus
             CharacterController cc = GetOwnerComponent<CharacterController>();
             if (cc == null) { _isActive = false; yield break; }
 
-            cc.enabled = false;
-
             float dist = Vector3.Distance(CasterTransform.position, target);
             float travelTime = dist / _pullSpeed;
             float elapsed = 0f;
             Vector3 start = CasterTransform.position;
 
+            // [FIX] BUG-04: Use CharacterController.Move instead of manual Transform mutation
             while (elapsed < travelTime)
             {
-                CasterTransform.position = Vector3.Lerp(start, target, elapsed / travelTime);
+                Vector3 currentPos = CasterTransform.position;
                 elapsed += Time.deltaTime;
-
-                // Broadcast position
-                RpcSyncPosition(CasterTransform.position);
+                float t = Mathf.Clamp01(elapsed / travelTime);
+                Vector3 intendedPos = Vector3.Lerp(start, target, t);
+                
+                cc.Move(intendedPos - currentPos);
                 yield return null;
             }
 
-            CasterTransform.position = target;
-            cc.enabled = true;
             _isActive = false;
             Debug.Log("[GrappleStrike] Pull complete.");
         }
@@ -119,11 +120,5 @@ namespace ProjectZ.Hero.Marcus
             Debug.Log("[GrappleStrike] Slow expired.");
         }
 
-        [ObserversRpc]
-        private void RpcSyncPosition(Vector3 pos)
-        {
-            if (!IsOwner && !IsServerInitialized)
-                transform.position = pos;
-        }
     }
 }
