@@ -29,4 +29,14 @@ jobs:
         with:
           projectBaseDir: .
           args: >
+            -Dsonar.projectKey=helis-d_ProjectZ
+            -Dsonar.organization=helis-d
+            -Dsonar.sources=Assets/Scripts,backend/src
+            -Dsonar.inclusions=Assets/Scripts/**/*.cs,backend/src/**/*.ts
             -Dsonar.csharp.analyze_test_dirs=false
+            -Dsonar.exclusions=Assets/Synty/**,Assets/Plugins/**,Packages/**,ProjectSettings/**,Library/**,Temp/**,backend/node_modules/**,backend/build/**,**/*.pb.go,**/*.go,**/*.h,**/*.c,**/*.cpp
+            -Dsonar.cpd.exclusions=Assets/Synty/**,Assets/Plugins/**,backend/node_modules/**,backend/build/**,**/*.pb.go,**/*.go
+            -Dsonar.go.file.suffixes=-
+            -Dsonar.c.file.suffixes=-
+            -Dsonar.cpp.file.suffixes=-
+            -Dsonar.objc.file.suffixes=-
