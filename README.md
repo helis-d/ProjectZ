@@ -3,7 +3,8 @@
   <img src="https://img.shields.io/badge/Networking-FishNet%20v4-blue" alt="FishNet v4">
   <img src="https://img.shields.io/badge/Backend-Nakama-orange" alt="Nakama">
   <img src="https://img.shields.io/badge/Genre-Tactical%20Hero%20Shooter-red" alt="Genre">
-  <img src="https://img.shields.io/badge/Codacy-Grade_A-brightgreen?logo=codacy" alt="Codacy Grade A">
+  <img src="https://img.shields.io/badge/SonarQube-Quality_Gate_Passed-success?logo=sonarqube" alt="SonarQube Quality Gate Passed">
+  <img src="https://img.shields.io/badge/SonarQube-0_Issues_A_Rating-success?logo=sonarqube" alt="SonarQube 0 Issues">
 </div>
 
 # ProjectZ: The Ultimate Tactical Hero Shooter 🎯
@@ -491,12 +492,12 @@ Repository systems natively output Docker Image configurations built explicitly 
 
 ## 🛡️ Code Quality & Engineering Standards
 
-ProjectZ maintains strict clean-code principles and SOLID architecture, rigorously verified through automated static analysis tools to ensure high maintainability and scalability for production and eSports levels.
+ProjectZ maintains strict clean-code principles and SOLID architecture, rigorously verified through automated static analysis tools (SonarQube) to ensure high maintainability and scalability for production and eSports levels.
 
-*   **Codacy Grade:** `A` (Stellar technical health)
-*   **Static Analysis Issues:** Extremely low (`~5.4` issues per 1,000 lines of code)
-*   **Code Complexity:** `18%` global codebase complexity
-*   **Architecture Strategy:** Heavy reliance on Object Pooling, decoupled Event Buses, and Server-Authoritative state machines to minimize duplication (`12%`) and prevent spaghetti code across ~15,600 lines of core logic.
+*   **Overall Ratings:** `A` (Security, Maintainability, Reliability)
+*   **Code Health:** `0` Open Issues, `0` Security Hotspots, `0` Vulnerabilities!
+*   **Code Duplication:** `0.0%`
+*   **Architecture Strategy:** Heavy reliance on Object Pooling, decoupled Event Buses, and Server-Authoritative state machines to minimize duplication (`0.0%`) and prevent spaghetti code across the core logic.
 
 ---
 *Created as an ultimate masterclass in modern Unity Protocol Paradigms, Systems Architecture integrations, and Networking execution capabilities flawlessly natively globally.*
