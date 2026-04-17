@@ -15,15 +15,18 @@ RUN useradd -ms /bin/bash unityuser
 WORKDIR /home/unityuser/app
 
 # Copy entire Linux Server build output (Unity may nest inside a subdirectory)
-COPY --chown=unityuser:unityuser ./Builds/LinuxServer/ /home/unityuser/app/
+COPY ./Builds/LinuxServer/ /home/unityuser/app/
+
+# Keep copied runtime artifacts immutable to non-root users.
+RUN find /home/unityuser/app -type d -exec chmod 755 {} \; && \
+    find /home/unityuser/app -type f -exec chmod 644 {} \; && \
+    find /home/unityuser/app -name "*.x86_64" -exec chmod 755 {} \; && \
+    chown -R root:root /home/unityuser/app
 
 USER unityuser
 
 # Expose standard game server port (FishNet default is usually UDP 7770)
 EXPOSE 7770/udp
-
-# Make all .x86_64 binaries executable
-RUN find /home/unityuser/app -name "*.x86_64" -exec chmod +x {} \;
 
 # Start the headless server — find the binary at runtime
 ENTRYPOINT ["sh", "-c", "exec $(find /home/unityuser/app -name '*.x86_64' | head -1) \"$@\"", "--"]
