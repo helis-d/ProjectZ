@@ -24,7 +24,7 @@ public class SniperWeapon : BaseWeapon
     {
         base.Awake();
         mainCam = Camera.main;
-        defaultFOV = mainCam.fieldOfView;
+        defaultFOV = mainCam != null ? mainCam.fieldOfView : 60f;
     }
 
     public override void PrimaryAttack()
@@ -56,8 +56,8 @@ public class SniperWeapon : BaseWeapon
         // Scope'dan çık (bolt-action geri alımı simülasyonu)
         if (isScoped) ExitScope();
 
-        Camera cam = Camera.main;
-        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+        if (!TryBuildFireRay(Vector3.zero, out Ray ray))
+            return;
 
         // Sniper penetrasyon: birden fazla hedefi deler (Operator gibi)
         RaycastHit[] hits = Physics.RaycastAll(ray, data.range);
@@ -75,7 +75,8 @@ public class SniperWeapon : BaseWeapon
                 // Mesafeye göre hasar düşürme
                 float distanceFactor = Mathf.Clamp01(1f - (hit.distance / data.range));
                 float finalDamage = data.damage * (penetrationCount == 0 ? 1f : 0.5f);
-                target.TakeDamage(finalDamage, hit.point, hit.normal);
+                if (!UsesAuthoritativeCombatPipeline())
+                    target.TakeDamage(finalDamage, hit.point, hit.normal);
                 penetrationCount++;
             }
         }
@@ -99,6 +100,9 @@ public class SniperWeapon : BaseWeapon
 
     private System.Collections.IEnumerator ZoomFOV(float targetFOV)
     {
+        if (mainCam == null)
+            yield break;
+
         float startFOV = mainCam.fieldOfView;
         float t = 0f;
         while (t < scopeInTime)

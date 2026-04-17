@@ -41,7 +41,6 @@ public class PistolWeapon : BaseWeapon
         weaponAnimator?.SetTrigger(AnimShoot);
         PlaySound(data.shootSound);
 
-        Camera cam = Camera.main;
         Vector3 spread;
         using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
         {
@@ -57,13 +56,13 @@ public class PistolWeapon : BaseWeapon
             );
         }
 
-        Ray ray = new Ray(cam.transform.position, cam.transform.forward + spread);
+        if (!TryBuildFireRay(spread, out Ray ray))
+            return;
 
         if (Physics.Raycast(ray, out RaycastHit hit, data.range))
         {
             SpawnImpact(hit.point, hit.normal);
-            if (hit.collider.TryGetComponent<IDamageable>(out var target))
-                target.TakeDamage(data.damage, hit.point, hit.normal);
+            TryApplyDirectDamage(hit, data.damage);
         }
     }
 

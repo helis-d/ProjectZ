@@ -127,7 +127,6 @@ interface SignedMatchResultPayload {
     version: number;
     matchKey: string;
     issuedAtUnix: number;
-    userId: string;
     mapId: string;
     gameMode: string;
     playerTeam: string;
@@ -378,7 +377,7 @@ function RpcFinalizeSignedMatchResult(ctx: nkruntime.Context, logger: nkruntime.
     }
 
     try {
-        var request = buildSignedMatchResultPayload(parsePayload(payload), ctx.userId);
+        var request = buildSignedMatchResultPayload(parsePayload(payload));
         var validationError = validateSignedMatchResultPayload(ctx, nk, request);
         if (validationError) {
             return JSON.stringify(signedMatchResultResponse(false, validationError.code, validationError.message, null, 0, 0, 0, request.matchKey, false, false));
@@ -758,12 +757,11 @@ function ensureRankedLeaderboard(logger: nkruntime.Logger, nk: nkruntime.Nakama)
     }
 }
 
-function buildSignedMatchResultPayload(raw: any, userId: string): SignedMatchResultPayload {
+function buildSignedMatchResultPayload(raw: any): SignedMatchResultPayload {
     return {
         version: clampMin(readNumber(raw.version, 1), 1),
         matchKey: normalizeId(raw.matchKey),
         issuedAtUnix: clampMin(readNumber(raw.issuedAtUnix, 0), 0),
-        userId: normalizeId(raw.userId || userId),
         mapId: normalizeId(raw.mapId),
         gameMode: normalizeId(raw.gameMode),
         playerTeam: normalizeId(raw.playerTeam),
@@ -789,12 +787,12 @@ function buildSignedMatchResultPayload(raw: any, userId: string): SignedMatchRes
 }
 
 function validateSignedMatchResultPayload(ctx: nkruntime.Context, nk: nkruntime.Nakama, payload: SignedMatchResultPayload): { code: string; message: string } | null {
-    if (!payload.matchKey || !payload.userId || !payload.signature) {
+    if (!payload.matchKey || !payload.signature) {
         return { code: "invalid_payload", message: "Signed match result is missing required fields." };
     }
 
-    if (payload.userId !== normalizeId(ctx.userId)) {
-        return { code: "user_mismatch", message: "Signed match result user mismatch." };
+    if (!resolveMatchResultSecret(ctx)) {
+        return { code: "backend_misconfigured", message: "Signed match result secret is not configured." };
     }
 
     var nowUnix = Math.floor(Date.now() / 1000);
@@ -819,7 +817,6 @@ function buildSignedMatchResultCanonicalString(payload: SignedMatchResultPayload
         clampMin(readNumber(payload.version, 1), 1),
         normalizeId(payload.matchKey),
         clampMin(readNumber(payload.issuedAtUnix, 0), 0),
-        normalizeId(payload.userId),
         normalizeId(payload.mapId),
         normalizeId(payload.gameMode),
         normalizeId(payload.playerTeam),
@@ -844,8 +841,7 @@ function buildSignedMatchResultCanonicalString(payload: SignedMatchResultPayload
 }
 
 function resolveMatchResultSecret(ctx: nkruntime.Context): string {
-    var configured = readStringEnv(ctx, MATCH_RESULT_SECRET_ENV, "");
-    return configured ? configured : "projectz-dev-match-result-secret";
+    return readStringEnv(ctx, MATCH_RESULT_SECRET_ENV, "");
 }
 
 function arrayBufferToHex(buffer: ArrayBuffer): string {

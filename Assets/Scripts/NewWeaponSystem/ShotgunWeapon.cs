@@ -41,7 +41,6 @@ public class ShotgunWeapon : BaseWeapon
         weaponAnimator?.SetTrigger(AnimShoot);
         PlaySound(data.shootSound);
 
-        Camera cam = Camera.main;
         float spread = isADS ? data.pelletSpread * adsSpreadMultiplier : data.pelletSpread;
 
         // Her pellet için ayrı raycast
@@ -53,7 +52,8 @@ public class ShotgunWeapon : BaseWeapon
                 0f
             );
 
-            Ray ray = new Ray(cam.transform.position, cam.transform.forward + spreadDir);
+            if (!TryBuildFireRay(spreadDir, out Ray ray))
+                return;
 
             if (Physics.Raycast(ray, out RaycastHit hit, data.range))
             {
@@ -63,7 +63,7 @@ public class ShotgunWeapon : BaseWeapon
                     // Mesafeye göre hasar düşürme (shotgun için kritik)
                     float distanceFactor = Mathf.Clamp01(1f - (hit.distance / (data.range * 0.5f)));
                     float pelletDamage = (data.damage / data.pelletsPerShot) * distanceFactor;
-                    target.TakeDamage(pelletDamage, hit.point, hit.normal);
+                    TryApplyDirectDamage(hit, pelletDamage);
                 }
             }
         }
@@ -78,14 +78,13 @@ public class ShotgunWeapon : BaseWeapon
         SpawnMuzzleFlash();
         weaponAnimator?.SetTrigger(AnimShoot);
 
-        Camera cam = Camera.main;
-        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+        if (!TryBuildFireRay(Vector3.zero, out Ray ray))
+            return;
 
         if (Physics.Raycast(ray, out RaycastHit hit, data.range * 1.5f))
         {
             SpawnImpact(hit.point, hit.normal);
-            if (hit.collider.TryGetComponent<IDamageable>(out var target))
-                target.TakeDamage(data.damage * 0.8f, hit.point, hit.normal);
+            TryApplyDirectDamage(hit, data.damage * 0.8f);
         }
     }
 }

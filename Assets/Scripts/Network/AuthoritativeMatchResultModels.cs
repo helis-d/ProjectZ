@@ -11,7 +11,6 @@ namespace ProjectZ.Network
         public int version = 1;
         public string matchKey;
         public long issuedAtUnix;
-        public string userId;
         public string mapId;
         public string gameMode;
         public string playerTeam;
@@ -38,12 +37,11 @@ namespace ProjectZ.Network
     internal static class AuthoritativeMatchResultSigning
     {
         internal const string SecretEnvironmentVariable = "PROJECTZ_MATCH_RESULT_SECRET";
-        private const string DevelopmentFallbackSecret = "projectz-dev-match-result-secret";
 
         public static string ResolveSharedSecret()
         {
             string envSecret = Environment.GetEnvironmentVariable(SecretEnvironmentVariable);
-            return string.IsNullOrWhiteSpace(envSecret) ? DevelopmentFallbackSecret : envSecret.Trim();
+            return string.IsNullOrWhiteSpace(envSecret) ? null : envSecret.Trim();
         }
 
         public static string BuildCanonicalMessage(AuthoritativeMatchResultPayload payload)
@@ -56,7 +54,6 @@ namespace ProjectZ.Network
                 payload.version.ToString(CultureInfo.InvariantCulture),
                 Normalize(payload.matchKey),
                 payload.issuedAtUnix.ToString(CultureInfo.InvariantCulture),
-                Normalize(payload.userId),
                 Normalize(payload.mapId),
                 Normalize(payload.gameMode),
                 Normalize(payload.playerTeam),
@@ -83,6 +80,9 @@ namespace ProjectZ.Network
         public static string ComputeSignature(AuthoritativeMatchResultPayload payload, string sharedSecret = null)
         {
             string secret = string.IsNullOrWhiteSpace(sharedSecret) ? ResolveSharedSecret() : sharedSecret;
+            if (string.IsNullOrWhiteSpace(secret))
+                throw new InvalidOperationException($"Missing required environment variable: {SecretEnvironmentVariable}");
+
             string message = BuildCanonicalMessage(payload);
 
             using HMACSHA256 hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
@@ -95,7 +95,6 @@ namespace ProjectZ.Network
             return payload != null
                 && payload.version > 0
                 && !string.IsNullOrWhiteSpace(payload.matchKey)
-                && !string.IsNullOrWhiteSpace(payload.userId)
                 && !string.IsNullOrWhiteSpace(payload.gameMode)
                 && !string.IsNullOrWhiteSpace(payload.winningTeam)
                 && !string.IsNullOrWhiteSpace(payload.playerTeam);

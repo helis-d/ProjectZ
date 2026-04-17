@@ -271,7 +271,9 @@ namespace Synty.SidekickCharacters.Database.DTO
                 dbManager.GetCurrentDbConnection().Insert(this);
                 // in theory this could return a different ID, but in practice it's highly unlikely
                 ID = (int) SQLite3.LastInsertRowid(dbManager.GetCurrentDbConnection().Handle);
+                return ID;
             }
+
             dbManager.GetCurrentDbConnection().Update(this);
             return ID;
         }

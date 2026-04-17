@@ -49,6 +49,13 @@ namespace ProjectZ.Network
             if (_resultsRelayed)
                 return;
 
+            string sharedSecret = AuthoritativeMatchResultSigning.ResolveSharedSecret();
+            if (string.IsNullOrWhiteSpace(sharedSecret))
+            {
+                Debug.LogError($"[SignedMatchResultRelay] Match result signing aborted because {AuthoritativeMatchResultSigning.SecretEnvironmentVariable} is not configured.");
+                return;
+            }
+
             _resultsRelayed = true;
 
             int bestScore = int.MinValue;
@@ -76,7 +83,7 @@ namespace ProjectZ.Network
                     continue;
 
                 NakamaProfileSyncer syncer = conn.FirstObject.GetComponent<NakamaProfileSyncer>();
-                if (syncer == null || string.IsNullOrWhiteSpace(syncer.SyncedUserId))
+                if (syncer == null)
                     continue;
 
                 PlayerStats stats = conn.FirstObject.GetComponent<PlayerStats>();
@@ -89,7 +96,6 @@ namespace ProjectZ.Network
                     version = 1,
                     matchKey = _matchKey,
                     issuedAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                    userId = syncer.SyncedUserId,
                     mapId = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.ToLowerInvariant(),
                     gameMode = ResolveGameMode(),
                     playerTeam = NormalizeTeam(playerTeam),
@@ -112,7 +118,7 @@ namespace ProjectZ.Network
                     mostUsedWeaponId = string.Empty
                 };
 
-                payload.signature = AuthoritativeMatchResultSigning.ComputeSignature(payload);
+                payload.signature = AuthoritativeMatchResultSigning.ComputeSignature(payload, sharedSecret);
                 syncer.DeliverAuthoritativeMatchResult(conn, JsonConvert.SerializeObject(payload));
             }
 

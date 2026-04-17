@@ -83,8 +83,7 @@ public class KnifeWeapon : BaseWeapon
         if (Physics.SphereCast(ray, 0.3f, out RaycastHit hit, range))
         {
             SpawnImpact(hit.point, hit.normal);
-            if (hit.collider.TryGetComponent<IDamageable>(out var target))
-                target.TakeDamage(damage, hit.point, hit.normal);
+            TryApplyDirectDamage(hit, damage);
         }
     }
 

@@ -442,13 +442,6 @@ namespace ProjectZ.Network
                 return;
             }
 
-            if (!string.IsNullOrWhiteSpace(UserId) &&
-                !string.Equals(payload.userId, UserId, StringComparison.OrdinalIgnoreCase))
-            {
-                Debug.LogWarning("[Nakama] Ignored authoritative match result for a different user.");
-                return;
-            }
-
             _pendingAuthoritativeMatchResult = payload;
 
             if (IsAuthenticated)

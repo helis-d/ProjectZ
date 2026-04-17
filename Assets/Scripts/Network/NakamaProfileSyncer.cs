@@ -18,7 +18,6 @@ namespace ProjectZ.Network
         [SerializeField] private PlayerHeroController _heroController;
 
         private bool _hasSyncedProfile;
-        public string SyncedUserId { get; private set; }
         public string SyncedDisplayName { get; private set; }
 
         private void Awake()
@@ -47,9 +46,8 @@ namespace ProjectZ.Network
         }
 
         [ServerRpc]
-        private void CmdSyncProfile(string userId, string displayName, string primaryId, string secondaryId, string meleeId, string selectedHeroId)
+        private void CmdSyncProfile(string displayName, string primaryId, string secondaryId, string meleeId, string selectedHeroId)
         {
-            SyncedUserId = string.IsNullOrWhiteSpace(userId) ? string.Empty : userId.Trim();
             SyncedDisplayName = string.IsNullOrWhiteSpace(displayName) ? $"player_{OwnerId}" : displayName.Trim();
 
             // Update inventory
@@ -74,7 +72,7 @@ namespace ProjectZ.Network
             }
 
             // Sync the name (if we have a PlayerName component, set it here)
-            Debug.Log($"[Server] Profile synced for client {OwnerId}: Name={SyncedDisplayName} UserId={SyncedUserId}");
+            Debug.Log($"[Server] Profile synced for client {OwnerId}: Name={SyncedDisplayName}");
         }
 
         [TargetRpc]
@@ -147,7 +145,6 @@ namespace ProjectZ.Network
                 $"{profile.primaryWeaponId} / {profile.secondaryWeaponId} / {profile.meleeWeaponId}");
 
             CmdSyncProfile(
-                NakamaManager.Instance != null ? NakamaManager.Instance.UserId : string.Empty,
                 profile.displayName,
                 profile.primaryWeaponId,
                 profile.secondaryWeaponId,

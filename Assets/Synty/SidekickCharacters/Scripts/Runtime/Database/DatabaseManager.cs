@@ -62,7 +62,7 @@ namespace Synty.SidekickCharacters.Database
         /// <returns>The current DB connection.</returns>
         public SQLiteConnection GetCurrentDbConnection()
         {
-            return _connection;
+            return _connection ?? GetDbConnection();
         }
 
         /// <summary>

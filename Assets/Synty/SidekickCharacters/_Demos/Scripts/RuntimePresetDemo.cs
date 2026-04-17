@@ -317,7 +317,14 @@ namespace Synty.SidekickCharacters.Demo
         private string GetResourcePath(string fullPath)
         {
             string directory = Path.GetDirectoryName(fullPath);
-            int startIndex = directory.IndexOf("Resources") + 10;
+            int resourcesIndex = directory.IndexOf("Resources", StringComparison.Ordinal);
+            if (resourcesIndex < 0)
+            {
+                Debug.LogWarning($"[RuntimePresetDemo] Could not build resource path because 'Resources' was not found in: {fullPath}");
+                return Path.GetFileNameWithoutExtension(fullPath);
+            }
+
+            int startIndex = resourcesIndex + "Resources".Length + 1;
             directory = directory.Substring(startIndex, directory.Length - startIndex);
             return Path.Combine(directory, Path.GetFileNameWithoutExtension(fullPath));
         }

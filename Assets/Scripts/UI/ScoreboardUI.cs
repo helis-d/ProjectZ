@@ -5,6 +5,7 @@ using ProjectZ.GameMode;
 using ProjectZ.Player;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace ProjectZ.UI
 {
@@ -25,11 +26,15 @@ namespace ProjectZ.UI
 
         private void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Tab))
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard == null)
+                return;
+
+            if (keyboard.tabKey.wasPressedThisFrame)
             {
                 OpenScoreboard();
             }
-            else if (Input.GetKeyUp(KeyCode.Tab))
+            else if (keyboard.tabKey.wasReleasedThisFrame)
             {
                 CloseScoreboard();
             }

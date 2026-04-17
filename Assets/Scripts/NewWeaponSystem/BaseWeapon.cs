@@ -156,6 +156,42 @@ public abstract class BaseWeapon : MonoBehaviour
         }
     }
 
+    protected bool TryBuildFireRay(Vector3 spread, out Ray ray)
+    {
+        Camera firingCamera = Camera.main;
+        if (firingCamera == null)
+            firingCamera = GetComponentInParent<Camera>();
+
+        if (firingCamera != null)
+        {
+            Vector3 direction = firingCamera.transform.forward + spread;
+            ray = new Ray(firingCamera.transform.position, direction.normalized);
+            return true;
+        }
+
+        Transform originTransform = muzzlePoint != null ? muzzlePoint : transform;
+        Vector3 fallbackDirection = originTransform.forward + spread;
+        if (fallbackDirection.sqrMagnitude <= 0.0001f)
+            fallbackDirection = transform.forward;
+
+        ray = new Ray(originTransform.position, fallbackDirection.normalized);
+        return true;
+    }
+
+    protected bool UsesAuthoritativeCombatPipeline()
+    {
+        return GetComponentInParent<ProjectZ.Player.PlayerCombatController>() != null;
+    }
+
+    protected void TryApplyDirectDamage(RaycastHit hit, float damage)
+    {
+        if (damage <= 0f || UsesAuthoritativeCombatPipeline())
+            return;
+
+        if (hit.collider.TryGetComponent<IDamageable>(out var target))
+            target.TakeDamage(damage, hit.point, hit.normal);
+    }
+
     protected void PlaySound(AudioClip clip)
     {
         if (clip && TryGetComponent<AudioSource>(out var src))
