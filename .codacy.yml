@@ -1,0 +1,7 @@
+exclude_paths:
+  - 'Assets/Synty/**'
+  - 'Assets/Plugins/**'
+  - 'backend/node_modules/**'
+  - 'backend/build/**'
+  - 'Library/**'
+  - 'Temp/**'

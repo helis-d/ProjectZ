@@ -32,5 +32,5 @@ jobs:
             -Dsonar.organization=helis-d
             -Dsonar.sources=Assets/Scripts
             -Dsonar.csharp.analyze_test_dirs=false
-            -Dsonar.exclusions=Assets/Plugins/**,Packages/**,ProjectSettings/**
-            -Dsonar.cpd.exclusions=Assets/Plugins/**
+            -Dsonar.exclusions=Assets/Plugins/**,Assets/Synty/**,Packages/**,ProjectSettings/**,backend/build/**,backend/node_modules/**,**/*.pb.go
+            -Dsonar.cpd.exclusions=Assets/Plugins/**,Assets/Synty/**,backend/build/**,backend/node_modules/**,**/*.pb.go

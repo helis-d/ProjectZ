@@ -1161,7 +1161,9 @@ function calculatePerformanceBonus(performance: RankedResultPayload): number {
         + (performance.wasMvp ? 2 : 0);
 
     let bonus = Math.round(rawBonus);
-    if (!performance.won) {
+    if (performance.won) {
+        // Keep positive bonus for wins as-is.
+    } else {
         bonus = Math.min(bonus, 2);
     }
 
@@ -1176,7 +1178,11 @@ function normalizeId(value: any): string { return typeof value === "string" ? va
 function stringifyValue(value: any, fallback: string): string { return typeof value === "string" && value.length > 0 ? value : fallback; }
 function readNumber(value: any, fallback: number): number {
     const parsed = Number(value);
-    return parsed !== parsed ? fallback : parsed;
+    if (!isFinite(parsed)) {
+        return fallback;
+    }
+
+    return parsed;
 }
 function clampMin(value: number, minimum: number): number { return Math.max(value, minimum); }
 function clamp(value: number, minimum: number, maximum: number): number { return Math.min(Math.max(value, minimum), maximum); }
@@ -1202,7 +1208,7 @@ function normalizeIds(values: any): string[] {
 }
 function readStringEnv(ctx: nkruntime.Context, key: string, fallback: string): string {
     const value = ctx.env?.[key];
-    return value ? value : fallback;
+    return value || fallback;
 }
 function readNumberEnv(ctx: nkruntime.Context, key: string, fallback: number): number { return readNumber(readStringEnv(ctx, key, String(fallback)), fallback); }
 function readBoolEnv(ctx: nkruntime.Context, key: string, fallback: boolean): boolean {
