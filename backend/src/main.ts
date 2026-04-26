@@ -126,6 +126,7 @@ interface RankedResultPayload {
 interface SignedMatchResultPayload {
     version: number;
     matchKey: string;
+    userId: string;
     issuedAtUnix: number;
     mapId: string;
     gameMode: string;
@@ -297,50 +298,17 @@ function RpcPurchaseOffer(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: 
 
 function RpcApplyRankedResult(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
     return runProfileRpc(ctx, logger, nk, function(userId, profile) {
-        const request = parsePayload(payload);
-        const performance = buildRankedResultPayload(request, profile);
-        const previousRating = profile.elo;
-        const delta = calculateRankedRatingDelta(performance, previousRating, profile.rankedMatchesPlayed);
-        const newRating = applyRankedRatingDelta(previousRating, delta);
-
-        profile.elo = newRating;
-        profile.rankedMatchesPlayed += 1;
-        if (performance.won) {
-            profile.rankedWins += 1;
-        } else {
-            profile.rankedLosses += 1;
-        }
-        if (profile.peakElo < newRating) {
-            profile.peakElo = newRating;
-        }
-
-        try {
-            nk.leaderboardRecordWrite(
-                RANKED_LEADERBOARD_ID,
-                userId,
-                ctx.username || profile.displayName,
-                newRating,
-                profile.peakElo,
-                {
-                    delta: delta,
-                    won: performance.won,
-                    opponentAverageRating: performance.opponentAverageRating,
-                    rankedMatchesPlayed: profile.rankedMatchesPlayed
-                },
-                nkruntime.OverrideOperator.SET);
-        } catch (error) {
-            logger.info("Ranked leaderboard write skipped: " + errorToString(error));
-        }
-
+        const payloadSize = payload ? payload.length : 0;
+        logger.warn("Deprecated ranked RPC called by user " + userId + " (payload bytes: " + payloadSize + "). Use projectz_finalize_signed_match_result.");
         return rankedResponse({
-            succeeded: true,
-            errorCode: null,
-            message: "Ranked result persisted.",
+            succeeded: false,
+            errorCode: "deprecated_rpc",
+            message: "Use projectz_finalize_signed_match_result.",
             profile: profile,
-            previousRating: previousRating,
-            newRating: newRating,
-            delta: delta,
-            persist: true
+            previousRating: profile.elo,
+            newRating: profile.elo,
+            delta: 0,
+            persist: false
         });
     });
 }
@@ -840,6 +808,7 @@ function buildSignedMatchResultPayload(raw: any): SignedMatchResultPayload {
     return {
         version: clampMin(readNumber(raw.version, 1), 1),
         matchKey: normalizeId(raw.matchKey),
+        userId: normalizeId(raw.userId),
         issuedAtUnix: clampMin(readNumber(raw.issuedAtUnix, 0), 0),
         mapId: normalizeId(raw.mapId),
         gameMode: normalizeId(raw.gameMode),
@@ -866,8 +835,12 @@ function buildSignedMatchResultPayload(raw: any): SignedMatchResultPayload {
 }
 
 function validateSignedMatchResultPayload(ctx: nkruntime.Context, nk: nkruntime.Nakama, payload: SignedMatchResultPayload): { code: string; message: string } | null {
-    if (!payload.matchKey || !payload.signature) {
+    if (!payload.matchKey || !payload.userId || !payload.signature) {
         return { code: "invalid_payload", message: "Signed match result is missing required fields." };
+    }
+
+    if (payload.userId !== normalizeId(ctx.userId)) {
+        return { code: "user_mismatch", message: "Signed match result is not assigned to this user." };
     }
 
     if (!resolveMatchResultSecret(ctx)) {
@@ -895,6 +868,7 @@ function buildSignedMatchResultCanonicalString(payload: SignedMatchResultPayload
     return [
         clampMin(readNumber(payload.version, 1), 1),
         normalizeId(payload.matchKey),
+        normalizeId(payload.userId),
         clampMin(readNumber(payload.issuedAtUnix, 0), 0),
         normalizeId(payload.mapId),
         normalizeId(payload.gameMode),

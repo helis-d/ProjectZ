@@ -19,6 +19,7 @@ namespace ProjectZ.Network
 
         private bool _hasSyncedProfile;
         public string SyncedDisplayName { get; private set; }
+        public string SyncedUserId { get; private set; }
 
         private void Awake()
         {
@@ -46,8 +47,9 @@ namespace ProjectZ.Network
         }
 
         [ServerRpc]
-        private void CmdSyncProfile(string displayName, string primaryId, string secondaryId, string meleeId, string selectedHeroId)
+        private void CmdSyncProfile(string userId, string displayName, string primaryId, string secondaryId, string meleeId, string selectedHeroId)
         {
+            SyncedUserId = string.IsNullOrWhiteSpace(userId) ? string.Empty : userId.Trim();
             SyncedDisplayName = string.IsNullOrWhiteSpace(displayName) ? $"player_{OwnerId}" : displayName.Trim();
 
             // Update inventory
@@ -135,16 +137,24 @@ namespace ProjectZ.Network
             if (!IsOwner || _hasSyncedProfile || profile == null)
                 return;
 
+            NakamaManager manager = NakamaManager.Instance;
+            string userId = manager != null ? manager.UserId : null;
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                Debug.LogWarning("[ProfileSyncer] Cannot sync profile before Nakama user id is available.");
+                return;
+            }
+
             _hasSyncedProfile = true;
 
-            if (NakamaManager.Instance != null)
-                NakamaManager.Instance.OnProfileLoaded -= HandleProfileLoaded;
+            manager.OnProfileLoaded -= HandleProfileLoaded;
 
             Debug.Log(
                 $"[ProfileSyncer] Syncing Nakama profile to server: {profile.displayName} | Hero={profile.selectedHero} | " +
                 $"{profile.primaryWeaponId} / {profile.secondaryWeaponId} / {profile.meleeWeaponId}");
 
             CmdSyncProfile(
+                userId,
                 profile.displayName,
                 profile.primaryWeaponId,
                 profile.secondaryWeaponId,
