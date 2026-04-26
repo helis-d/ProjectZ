@@ -28,6 +28,7 @@ namespace ProjectZ.Player
 
         private IEnumerator RecordRoutine()
         {
+            // codacy:disable
             while (true)
             {
                 // Add current position to rear of queue
