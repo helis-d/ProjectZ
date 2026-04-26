@@ -74,7 +74,7 @@ public class SniperWeapon : BaseWeapon
             {
                 // Mesafeye göre hasar düşürme
                 float distanceFactor = Mathf.Clamp01(1f - (hit.distance / data.range));
-                float finalDamage = data.damage * (penetrationCount == 0 ? 1f : 0.5f);
+                float finalDamage = data.damage * distanceFactor * (penetrationCount == 0 ? 1f : 0.5f);
                 if (!UsesAuthoritativeCombatPipeline())
                     target.TakeDamage(finalDamage, hit.point, hit.normal);
                 penetrationCount++;

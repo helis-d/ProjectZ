@@ -86,6 +86,13 @@ namespace ProjectZ.Network
                 if (syncer == null)
                     continue;
 
+                string nakamaUserId = syncer.SyncedUserId;
+                if (string.IsNullOrWhiteSpace(nakamaUserId))
+                {
+                    Debug.LogWarning($"[SignedMatchResultRelay] Skipping client {conn.ClientId}; Nakama user id was not synced.");
+                    continue;
+                }
+
                 PlayerStats stats = conn.FirstObject.GetComponent<PlayerStats>();
                 PlayerHeroController heroController = conn.FirstObject.GetComponent<PlayerHeroController>();
                 PlayerEconomy economy = conn.FirstObject.GetComponent<PlayerEconomy>();
@@ -93,8 +100,9 @@ namespace ProjectZ.Network
 
                 AuthoritativeMatchResultPayload payload = new AuthoritativeMatchResultPayload
                 {
-                    version = 1,
+                    version = 2,
                     matchKey = _matchKey,
+                    userId = nakamaUserId,
                     issuedAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                     mapId = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.ToLowerInvariant(),
                     gameMode = ResolveGameMode(),

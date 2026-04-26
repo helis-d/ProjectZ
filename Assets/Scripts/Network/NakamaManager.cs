@@ -66,7 +66,6 @@ namespace ProjectZ.Network
         private const string RPC_SELECT_HERO = "projectz_select_hero";
         private const string RPC_UNLOCK_HERO = "projectz_unlock_hero";
         private const string RPC_PURCHASE_OFFER = "projectz_purchase_offer";
-        private const string RPC_APPLY_RANKED_RESULT = "projectz_apply_ranked_result";
         private const string RPC_SUBMIT_MATCH_TELEMETRY = "projectz_submit_match_telemetry";
         private const string RPC_FINALIZE_SIGNED_MATCH_RESULT = "projectz_finalize_signed_match_result";
         private const float SIGNED_RESULT_WAIT_WINDOW_SECONDS = 5f;
@@ -276,32 +275,17 @@ namespace ProjectZ.Network
         {
             EnsureCachedProfile();
             int previousRating = CachedProfile.elo;
+            _ = performance;
 
             BackendSignedMatchResultResponse signedResponse = await TryAwaitSignedMatchResultAsync();
             if (signedResponse != null && signedResponse.succeeded)
                 return CompetitiveRankSystem.BuildProgressionResult(signedResponse.previousRating, signedResponse.newRating);
 
-            BackendRankedResultResponse response = await CallBackendRpcAsync<BackendRankedResultResponse>(
-                RPC_APPLY_RANKED_RESULT,
-                new BackendRankedResultRequest
-                {
-                    opponentAverageRating = performance.OpponentAverageRating,
-                    won = performance.Won,
-                    kills = performance.Kills,
-                    deaths = performance.Deaths,
-                    assists = performance.Assists,
-                    roundsWon = performance.RoundsWon,
-                    roundsLost = performance.RoundsLost,
-                    wasMvp = performance.WasMvp
-                });
+            if (signedResponse != null)
+                Debug.LogWarning($"[Nakama] Signed ranked result rejected: {signedResponse.errorCode} | {signedResponse.message}. Returning unchanged progression snapshot.");
+            else
+                Debug.LogWarning("[Nakama] Signed ranked result was unavailable. Returning unchanged progression snapshot.");
 
-            if (response?.profile != null)
-                ApplyBackendProfile(response.profile);
-
-            if (response != null && response.succeeded)
-                return CompetitiveRankSystem.BuildProgressionResult(response.previousRating, response.newRating);
-
-            Debug.LogWarning("[Nakama] Ranked result persistence failed; returning unchanged progression snapshot.");
             return CompetitiveRankSystem.BuildProgressionResult(previousRating, previousRating);
         }
 
@@ -442,6 +426,12 @@ namespace ProjectZ.Network
                 return;
             }
 
+            if (IsAuthenticated && !IsPayloadForCurrentUser(payload))
+            {
+                Debug.LogWarning("[Nakama] Ignored authoritative match result for a different Nakama user.");
+                return;
+            }
+
             _pendingAuthoritativeMatchResult = payload;
 
             if (IsAuthenticated)
@@ -489,6 +479,12 @@ namespace ProjectZ.Network
             if (payload == null || !IsAuthenticated)
                 return null;
 
+            if (!IsPayloadForCurrentUser(payload))
+            {
+                Debug.LogWarning("[Nakama] Refusing to submit authoritative match result for a different Nakama user.");
+                return null;
+            }
+
             if (!string.IsNullOrWhiteSpace(_lastAuthoritativeMatchResultKey) &&
                 string.Equals(_lastAuthoritativeMatchResultKey, payload.matchKey, StringComparison.OrdinalIgnoreCase) &&
                 _lastAuthoritativeMatchResultResponse != null)
@@ -533,6 +529,14 @@ namespace ProjectZ.Network
                 _authoritativeMatchResultTask = null;
                 _authoritativeMatchResultTaskKey = null;
             }
+        }
+
+        private bool IsPayloadForCurrentUser(AuthoritativeMatchResultPayload payload)
+        {
+            return payload != null
+                && !string.IsNullOrWhiteSpace(payload.userId)
+                && !string.IsNullOrWhiteSpace(UserId)
+                && string.Equals(payload.userId.Trim(), UserId.Trim(), StringComparison.OrdinalIgnoreCase);
         }
 
         public bool HasPendingMatchToken()
@@ -676,7 +680,7 @@ namespace ProjectZ.Network
                     stringProps,
                     numericProps);
 
-                Debug.Log($"[Nakama] SBMM ticket issued — Query: {query} | Min: {minCount} Max: {maxCount} | Ticket: {ticket.Ticket}");
+                Debug.Log($"[Nakama] SBMM ticket issued — Query: {query} | Min: {minCount} Max: {maxCount} | Ticket: {RedactToken(ticket.Ticket)}");
                 return ticket;
             }
             catch (Exception e)
@@ -722,8 +726,17 @@ namespace ProjectZ.Network
         private void HandleMatchmakerMatched(IMatchmakerMatched matched)
         {
             PendingMatchToken = matched.Token;
-            Debug.Log($"[Nakama] Match found! Token: {matched.Token}");
+            Debug.Log($"[Nakama] Match found! Token: {RedactToken(matched.Token)}");
             OnMatchFound?.Invoke(matched);
+        }
+
+        private static string RedactToken(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+                return "<empty>";
+
+            int visibleChars = Mathf.Min(8, token.Length);
+            return token.Substring(0, visibleChars) + "...";
         }
 
         // ─── Match Telemetry ──────────────────────────────────────────
@@ -803,19 +816,6 @@ namespace ProjectZ.Network
         private sealed class BackendOfferRequest
         {
             public string offerId;
-        }
-
-        [Serializable]
-        private sealed class BackendRankedResultRequest
-        {
-            public int opponentAverageRating;
-            public bool won;
-            public int kills;
-            public int deaths;
-            public int assists;
-            public int roundsWon;
-            public int roundsLost;
-            public bool wasMvp;
         }
 
         [Serializable]

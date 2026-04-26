@@ -81,12 +81,15 @@ namespace ProjectZ.UI
         {
             if (_indicatorPrefab == null || _indicatorContainer == null) return;
 
+            Camera mainCamera = Camera.main;
+            if (mainCamera == null) return;
+
             GameObject indicator = Instantiate(_indicatorPrefab, _indicatorContainer);
 
             // Calculate angle from player to damage source
-            Vector3 toSource = sourceWorld - Camera.main.transform.position;
+            Vector3 toSource = sourceWorld - mainCamera.transform.position;
             toSource.y = 0f;
-            float angle = Vector3.SignedAngle(Camera.main.transform.forward, toSource, Vector3.up);
+            float angle = Vector3.SignedAngle(mainCamera.transform.forward, toSource, Vector3.up);
 
             indicator.transform.localRotation = Quaternion.Euler(0f, 0f, -angle);
 
