@@ -1,4 +1,7 @@
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace ProjectZ.Settings.UI
 {
@@ -21,10 +24,14 @@ namespace ProjectZ.Settings.UI
         private void Update()
         {
             // Toggle menu with ESC
-            if (Input.GetKeyDown(KeyCode.Escape))
-            {
+#if ENABLE_INPUT_SYSTEM
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
                 ToggleMenu();
-            }
+#else
+            if (Input.GetKeyDown(KeyCode.Escape))
+                ToggleMenu();
+#endif
         }
 
         public void ToggleMenu()

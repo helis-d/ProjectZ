@@ -6,6 +6,9 @@ using ProjectZ.Map;
 using ProjectZ.Player;
 using ProjectZ.Weapon;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace ProjectZ.UI
 {
@@ -43,8 +46,14 @@ namespace ProjectZ.UI
             if (_buyMenuPanel != null && _buyMenuPanel.activeSelf && !CanUseBuyMenu())
                 CloseMenu();
 
+#if ENABLE_INPUT_SYSTEM
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard != null && keyboard.bKey.wasPressedThisFrame)
+                ToggleMenu();
+#else
             if (Input.GetKeyDown(KeyCode.B))
                 ToggleMenu();
+#endif
         }
 
         private void ToggleMenu()
@@ -102,38 +111,34 @@ namespace ProjectZ.UI
             if (BuyZone.HasConfiguredZones() && !BuyZone.IsPlayerInsideFriendlyZone(gameObject, OwnerId))
                 return;
 
-            PlayerEconomy economy = GetComponent<PlayerEconomy>();
-            if (economy == null || !economy.TrySpendMoney(requestedPrice))
-                return;
-
-            // Look up WeaponData from the server-side catalog
             WeaponData purchasedWeapon = FindWeaponById(weaponId);
             if (purchasedWeapon == null)
             {
                 Debug.LogError($"[BuyMenu] Unknown weapon ID: {weaponId}");
-                economy.AddMoney(requestedPrice); // Refund
                 return;
             }
 
-            // Validate price matches catalog
             if (purchasedWeapon.price != requestedPrice)
             {
-                Debug.LogWarning($"[BuyMenu] Price mismatch for {weaponId}. Refunding.");
-                economy.AddMoney(requestedPrice);
+                Debug.LogWarning($"[BuyMenu] Price mismatch for {weaponId}. Purchase rejected.");
                 return;
             }
+
+            PlayerEconomy economy = GetComponent<PlayerEconomy>();
+            if (economy == null || !economy.TrySpendMoney(purchasedWeapon.price))
+                return;
 
             // Add weapon to player inventory
             PlayerInventory inventory = GetComponent<PlayerInventory>();
             if (inventory == null)
             {
-                Debug.LogError($"[BuyMenu] Player {OwnerId} has no PlayerInventory. Refunding {requestedPrice} credits.");
-                economy.AddMoney(requestedPrice);
+                Debug.LogError($"[BuyMenu] Player {OwnerId} has no PlayerInventory. Refunding {purchasedWeapon.price} credits.");
+                economy.AddMoney(purchasedWeapon.price);
                 return;
             }
 
             inventory.PickUpWeapon(purchasedWeapon);
-            Debug.Log($"[Server] Player {OwnerId} bought {purchasedWeapon.weaponName} for ${requestedPrice}");
+            Debug.Log($"[Server] Player {OwnerId} bought {purchasedWeapon.weaponName} for ${purchasedWeapon.price}");
         }
 
         [ServerRpc]
