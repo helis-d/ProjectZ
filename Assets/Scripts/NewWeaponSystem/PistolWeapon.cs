@@ -1,3 +1,4 @@
+using ProjectZ.Core;
 using ProjectZ.Weapon;
 using UnityEngine;
 
@@ -41,20 +42,11 @@ public class PistolWeapon : BaseWeapon
         weaponAnimator?.SetTrigger(AnimShoot);
         PlaySound(data.shootSound);
 
-        Vector3 spread;
-        using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
-        {
-            byte[] bytes = new byte[8];
-            rng.GetBytes(bytes);
-            float randX = ((float)System.BitConverter.ToUInt32(bytes, 0) / uint.MaxValue) * 2f - 1f;
-            float randY = ((float)System.BitConverter.ToUInt32(bytes, 4) / uint.MaxValue) * 2f - 1f;
-            
-            spread = new Vector3(
-                randX * data.bulletSpread,
-                randY * data.bulletSpread,
-                0f
-            );
-        }
+        Vector3 spread = new Vector3(
+            SecureRandom.Range(-data.bulletSpread, data.bulletSpread),
+            SecureRandom.Range(-data.bulletSpread, data.bulletSpread),
+            0f
+        );
 
         if (!TryBuildFireRay(spread, out Ray ray))
             return;

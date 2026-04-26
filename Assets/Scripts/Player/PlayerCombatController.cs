@@ -53,7 +53,7 @@ namespace ProjectZ.Player
 
             _hitscanShooter = GetComponent<HitscanShooter>();
             _damageProcessor = GetComponent<DamageProcessor>();
-            _weaponManager = PlayerWeaponRuntimeBootstrap.EnsureWeaponRig(gameObject, GetComponent<WeaponManager>());
+            _weaponManager = WeaponRuntimeRigBuilder.EnsurePlayerRig(gameObject, GetComponent<WeaponManager>());
 
             // [FIX] BUG-29: initialize collections in Awake per architecture rule
             _serverAmmoTracker = new System.Collections.Generic.Dictionary<int, int>();

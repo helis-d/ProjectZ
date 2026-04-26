@@ -212,7 +212,7 @@ namespace ProjectZ.UI
                 }
             }
 
-            return WeaponCatalog.Instance?.GetById(weaponId);
+            return WeaponCatalog.Resolve(weaponId);
         }
 
         private bool TryGetCurrentMode(out BaseGameMode mode)

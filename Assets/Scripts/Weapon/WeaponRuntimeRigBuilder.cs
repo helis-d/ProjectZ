@@ -1,11 +1,14 @@
-using ProjectZ.Weapon;
 using UnityEngine;
 
-namespace ProjectZ.Player
+namespace ProjectZ.Weapon
 {
-    internal static class PlayerWeaponRuntimeBootstrap
+    /// <summary>
+    /// Owns the runtime-only fallback weapon rig used by player prefabs that do not ship
+    /// with an authored weapon hierarchy in-scene.
+    /// </summary>
+    internal static class WeaponRuntimeRigBuilder
     {
-        public static WeaponManager EnsureWeaponRig(GameObject playerRoot, WeaponManager existingManager)
+        public static WeaponManager EnsurePlayerRig(GameObject playerRoot, WeaponManager existingManager)
         {
             if (playerRoot == null)
                 return existingManager;
@@ -29,11 +32,6 @@ namespace ProjectZ.Player
             weaponManager.meleeWeapon = EnsureWeapon<KnifeWeapon>(anchor, "Melee_TacticalKnife", "knife_tactical");
             weaponManager.RebuildWeaponCache();
             return weaponManager;
-        }
-
-        public static WeaponData GetFallbackWeapon(string weaponId)
-        {
-            return WeaponCatalog.Instance?.GetById(weaponId);
         }
 
         private static Transform EnsureAnchor(Transform playerRoot)
@@ -76,7 +74,7 @@ namespace ProjectZ.Player
             weapon.muzzlePoint = muzzle;
             weapon.shellEjectPoint = eject;
             if (weapon.data == null || weapon.data.weaponId != weaponId)
-                weapon.InitializeRuntimeData(GetFallbackWeapon(weaponId));
+                weapon.InitializeRuntimeData(WeaponCatalog.Resolve(weaponId));
 
             return weapon;
         }

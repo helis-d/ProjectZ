@@ -56,13 +56,13 @@ namespace ProjectZ.Network
             if (_inventory != null)
             {
                 // Force spawn weapons through PlayerInventory
-                var pmData = Weapon.WeaponCatalog.Instance?.GetById(primaryId);
+                var pmData = Weapon.WeaponCatalog.Resolve(primaryId);
                 if (pmData != null) _inventory.PickUpWeapon(pmData);
 
-                var secData = Weapon.WeaponCatalog.Instance?.GetById(secondaryId);
+                var secData = Weapon.WeaponCatalog.Resolve(secondaryId);
                 if (secData != null) _inventory.PickUpWeapon(secData);
 
-                var meleeData = Weapon.WeaponCatalog.Instance?.GetById(meleeId);
+                var meleeData = Weapon.WeaponCatalog.Resolve(meleeId);
                 if (meleeData != null) _inventory.PickUpWeapon(meleeData);
             }
 

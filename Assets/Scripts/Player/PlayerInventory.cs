@@ -39,7 +39,7 @@ namespace ProjectZ.Player
         private WeaponMasteryManager _mastery;
 
         // ─── Helpers ──────────────────────────────────────────────────────
-        private WeaponData GetWeaponData(string id) => WeaponCatalog.Instance?.GetById(id);
+        private WeaponData GetWeaponData(string id) => WeaponCatalog.Resolve(id);
         public WeaponData ActiveWeaponData => GetWeaponData(GetActiveWeaponId());
         
         private string GetActiveWeaponId()
@@ -61,7 +61,7 @@ namespace ProjectZ.Player
             if (_weaponManager == null)
                 _weaponManager = GetComponentInChildren<WeaponManager>();
 
-            _weaponManager = PlayerWeaponRuntimeBootstrap.EnsureWeaponRig(gameObject, _weaponManager);
+            _weaponManager = WeaponRuntimeRigBuilder.EnsurePlayerRig(gameObject, _weaponManager);
 
             _activeSlot.OnChange += OnActiveSlotChanged;
         }
@@ -71,10 +71,10 @@ namespace ProjectZ.Player
             base.OnStartServer();
 
             if (_defaultSecondary == null)
-                _defaultSecondary = PlayerWeaponRuntimeBootstrap.GetFallbackWeapon("pistol_classic");
+                _defaultSecondary = WeaponCatalog.Resolve("pistol_classic");
 
             if (_defaultMelee == null)
-                _defaultMelee = PlayerWeaponRuntimeBootstrap.GetFallbackWeapon("knife_tactical");
+                _defaultMelee = WeaponCatalog.Resolve("knife_tactical");
 
             if (_defaultSecondary != null)
             {
@@ -94,7 +94,7 @@ namespace ProjectZ.Player
         public override void OnStartClient()
         {
             base.OnStartClient();
-            _weaponManager = PlayerWeaponRuntimeBootstrap.EnsureWeaponRig(gameObject, _weaponManager);
+            _weaponManager = WeaponRuntimeRigBuilder.EnsurePlayerRig(gameObject, _weaponManager);
             RefreshWeaponController();
         }
 
@@ -230,7 +230,7 @@ namespace ProjectZ.Player
         private void RefreshWeaponController()
         {
             if (_weaponManager == null)
-                _weaponManager = PlayerWeaponRuntimeBootstrap.EnsureWeaponRig(gameObject, _weaponManager);
+                _weaponManager = WeaponRuntimeRigBuilder.EnsurePlayerRig(gameObject, _weaponManager);
 
             if (_weaponManager == null)
                 return;

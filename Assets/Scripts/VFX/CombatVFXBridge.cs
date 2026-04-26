@@ -1,6 +1,7 @@
 using UnityEngine;
 using FishNet.Object;
 using ProjectZ.Player;
+using ProjectZ.Weapon;
 
 namespace ProjectZ.VFX
 {
@@ -61,7 +62,7 @@ namespace ProjectZ.VFX
                 _hitImpact = obj.AddComponent<HitImpactSystem>();
             }
 
-            _weaponManager = PlayerWeaponRuntimeBootstrap.EnsureWeaponRig(gameObject, GetComponent<WeaponManager>());
+            _weaponManager = WeaponRuntimeRigBuilder.EnsurePlayerRig(gameObject, GetComponent<WeaponManager>());
         }
 
         private void Update()
