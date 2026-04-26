@@ -101,8 +101,9 @@ namespace ProjectZ.Network
 
         private void Update()
         {
-            if (!IsServerInitialized || Time.time < _nextSampleTime) return;
-            _nextSampleTime = Time.time + _samplingInterval;
+            float now = Time.unscaledTime;
+            if (!IsServerInitialized || now < _nextSampleTime) return;
+            _nextSampleTime = now + _samplingInterval;
 
             foreach (var kv in _serverManager.Clients)
             {
@@ -116,19 +117,19 @@ namespace ProjectZ.Network
 
                 if (!_snapshots.TryGetValue(connId, out PlayerSnapshot snap))
                 {
-                    _snapshots[connId] = new PlayerSnapshot { LastPosition = currentPos, LastTime = Time.time };
+                    _snapshots[connId] = new PlayerSnapshot { LastPosition = currentPos, LastTime = now };
                     continue;
                 }
 
-                float elapsed  = Time.time - snap.LastTime;
+                float elapsed  = now - snap.LastTime;
                 if (elapsed <= 0f) continue;
 
                 float distance = Vector3.Distance(currentPos, snap.LastPosition);
                 float speed    = distance / elapsed;
 
-                EvaluateSpeedViolation(connId, conn, speed, distance, currentPos, snap.LastPosition);
+                EvaluateSpeedViolation(connId, conn, speed, distance);
 
-                _snapshots[connId] = new PlayerSnapshot { LastPosition = currentPos, LastTime = Time.time };
+                _snapshots[connId] = new PlayerSnapshot { LastPosition = currentPos, LastTime = now };
             }
         }
 
@@ -136,9 +137,7 @@ namespace ProjectZ.Network
             int connId,
             FishNet.Connection.NetworkConnection conn,
             float speed,
-            float distance,
-            Vector3 currentPos,
-            Vector3 lastPos)
+            float distance)
         {
             float allowedSpeed = MAX_SPEED_UPS * _speedToleranceMultiplier;
             bool  isTeleport   = distance > _maxTeleportDistance;
@@ -157,7 +156,6 @@ namespace ProjectZ.Network
                 $"[AntiCheat] {type} detected — Player {connId} " +
                 $"| Speed: {speed:F2} u/s (Limit: {allowedSpeed:F2}) " +
                 $"| Distance: {distance:F2} m " +
-                $"| Pos: {lastPos} → {currentPos} " +
                 $"| Violations: {vCount}");
 
             if (vCount >= _banFlagThreshold)

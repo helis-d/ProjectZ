@@ -183,7 +183,10 @@ namespace ProjectZ.Player
             CurrentSpeed = speed;
 
             // 2. Horizontal Movement
-            Vector3 move = md.Right * md.Input.x + md.Forward * md.Input.y;
+            Vector3 forward = SanitizePlanarDirection(md.Forward, transform.forward);
+            Vector3 right = SanitizePlanarDirection(md.Right, transform.right);
+            Vector3 move = right * md.Input.x + forward * md.Input.y;
+            move = Vector3.ClampMagnitude(move, 1f);
             Vector3 horizontalVelocity = move * speed;
 
             // 3. Gravity & Jump (Ground check via CharacterController)
@@ -233,6 +236,21 @@ namespace ProjectZ.Player
                 castDistance,
                 _groundMask,
                 QueryTriggerInteraction.Ignore);
+        }
+
+        private static Vector3 SanitizePlanarDirection(Vector3 direction, Vector3 fallback)
+        {
+            direction.y = 0f;
+            if (direction.sqrMagnitude <= 0.0001f)
+            {
+                direction = fallback;
+                direction.y = 0f;
+            }
+
+            if (direction.sqrMagnitude <= 0.0001f)
+                return Vector3.forward;
+
+            return direction.normalized;
         }
 
         // Update can be used for smooth visual interpolation if needed in the future

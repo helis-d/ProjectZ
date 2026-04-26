@@ -33,6 +33,8 @@ namespace ProjectZ.Sphere
         private int _activeDefuserId = -1;
         private float _defuseStartTime;
         private bool _defuseUsedKit;
+        private const int MaxDetonationColliders = 128;
+        private Collider[] _detonationHits;
 
         private void Awake()
         {
@@ -42,6 +44,7 @@ namespace ProjectZ.Sphere
                 return;
             }
             Instance = this;
+            _detonationHits = new Collider[MaxDetonationColliders];
         }
 
         private void Update()
@@ -51,7 +54,7 @@ namespace ProjectZ.Sphere
 
             if (CurrentState.Value == SphereState.Active && _isPlanted)
             {
-                Timer.Value -= Time.deltaTime;
+                Timer.Value -= Time.unscaledDeltaTime;
                 if (Timer.Value <= 0f)
                     Detonate();
             }
@@ -146,7 +149,7 @@ namespace ProjectZ.Sphere
                 return false;
 
             _defuseUsedKit = TryGetDefuseKit(connId, out bool kit) && kit;
-            _defuseStartTime = Time.time;
+            _defuseStartTime = Time.unscaledTime;
             _activeDefuserId = connId;
             CurrentState.Value = SphereState.Defusing;
             return true;
@@ -176,7 +179,7 @@ namespace ProjectZ.Sphere
             }
 
             float required = GetDefuseTime(_defuseUsedKit);
-            if (Time.time < _defuseStartTime + required - 0.08f)
+            if (Time.unscaledTime < _defuseStartTime + required - 0.08f)
             {
                 CancelDefuse(connId);
                 return;
@@ -205,9 +208,10 @@ namespace ProjectZ.Sphere
             _activeDefuserId = -1;
             _defuseStartTime = 0f;
 
-            Collider[] colliders = Physics.OverlapSphere(transform.position, _killRadius);
-            foreach (Collider col in colliders)
+            int colliderCount = Physics.OverlapSphereNonAlloc(transform.position, _killRadius, _detonationHits);
+            for (int i = 0; i < colliderCount; i++)
             {
+                Collider col = _detonationHits[i];
                 ProjectZ.Player.PlayerHealth health = col.GetComponentInParent<ProjectZ.Player.PlayerHealth>();
                 if (health != null)
                 {

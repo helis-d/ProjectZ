@@ -36,6 +36,7 @@ namespace ProjectZ.Player
         private const float MaxAcceptedOriginDesync = 3f;
         private const float MaxAcceptedAimAngleDegrees = 75f;
         private const float MaxRollbackWindowSeconds = 1.25f;
+        private const double MaxFutureTickGraceSeconds = 0.1d;
         private uint _lastServerFireTick;
         // [FIX] BUG-29: initialized in Awake, not field declaration
         private System.Collections.Generic.Dictionary<int, int> _serverAmmoTracker;
@@ -146,7 +147,7 @@ namespace ProjectZ.Player
             int instanceId = weapon.GetInstanceID();
             
             // İstemcinin hile yapıp anında reload yollamasını engelle (Server-Authoritative Reload)
-            yield return new WaitForSeconds(weapon.data.reloadTime);
+            yield return new WaitForSecondsRealtime(weapon.data.reloadTime);
             
             // A16Z Anti-Cheat: GHOST RELOAD FIX (Oyuncu silah değiştirdiyse mermiyi fulleme, hileyi iptal et)
             if (_weaponManager != null && _weaponManager.GetActiveWeapon() == weapon)
@@ -165,6 +166,14 @@ namespace ProjectZ.Player
         private void CmdFire(Vector3 clientOrigin, Vector3 clientDirection, string weaponId, PreciseTick clientTick)
         {
             if (_weaponManager == null) return;
+            if (!clientTick.IsValid()) return;
+
+            double rollbackAgeSeconds = TimeManager.TimePassed(clientTick, true);
+            if (rollbackAgeSeconds < -MaxFutureTickGraceSeconds || rollbackAgeSeconds > MaxRollbackWindowSeconds)
+            {
+                Debug.LogWarning($"[Anti-Cheat] Player {OwnerId} sent an invalid fire tick.");
+                return;
+            }
 
             BaseWeapon activeWeapon = _weaponManager.GetActiveWeapon();
             if (activeWeapon == null || activeWeapon.data == null || activeWeapon.data.weaponId != weaponId) return;
@@ -173,8 +182,10 @@ namespace ProjectZ.Player
 
             // 1. A16Z ANTI-CHEAT: MAKRO & HIZLI ATEŞ (RAPID FIRE) ALGORİTMASI
             // Ateşler arası geçen süre silahın limitinden hızlıysa isteği çöpe at! (-0.05d pingleme toleransı)
-            uint requiredTicks = TimeManager.TimeToTicks(activeWeapon.data.fireRate - 0.05f);
-            if (TimeManager.Tick < _lastServerFireTick + requiredTicks)
+            double minimumFireWindow = TimeManager.TickDelta;
+            double acceptedFireWindow = System.Math.Max(minimumFireWindow, activeWeapon.data.fireRate - 0.05d);
+            uint requiredTicks = TimeManager.TimeToTicks(acceptedFireWindow, TickRounding.RoundUp);
+            if (_lastServerFireTick != 0 && TimeManager.Tick < _lastServerFireTick + requiredTicks)
             {
                 Debug.LogWarning($"[Anti-Cheat] Player {OwnerId} tried to Rapid/Macro Fire.");
                 return; 
@@ -191,26 +202,52 @@ namespace ProjectZ.Player
             }
 
             // Doğrulandı: Mermiyi azalt ve süreyi kaydet
+            if (_hitscanShooter == null || _damageProcessor == null) return;
+
+            if (clientDirection.sqrMagnitude <= 0.0001f)
+                return;
+
+            Vector3 direction = clientDirection.normalized;
+            Vector3 serverOrigin = activeWeapon.muzzlePoint ? activeWeapon.muzzlePoint.position : transform.position;
+            Vector3 serverForward = activeWeapon.muzzlePoint ? activeWeapon.muzzlePoint.forward : transform.forward;
+
+            if (Vector3.Distance(clientOrigin, serverOrigin) > MaxAcceptedOriginDesync)
+            {
+                Debug.LogWarning($"[Anti-Cheat] Player {OwnerId} sent a desynced fire origin.");
+                return;
+            }
+
+            if (serverForward.sqrMagnitude > 0.0001f && Vector3.Angle(serverForward.normalized, direction) > MaxAcceptedAimAngleDegrees)
+            {
+                Debug.LogWarning($"[Anti-Cheat] Player {OwnerId} sent an impossible fire angle.");
+                return;
+            }
+
             _serverAmmoTracker[instanceId]--;
             _lastServerFireTick = TimeManager.Tick;
 
-            if (_hitscanShooter == null || _damageProcessor == null) return;
-
-            Vector3 direction = clientDirection.sqrMagnitude > 0.0001f ? clientDirection.normalized : transform.forward;
-            Vector3 serverOrigin = activeWeapon.muzzlePoint ? activeWeapon.muzzlePoint.position : transform.position;
-            Vector3 origin = Vector3.Distance(clientOrigin, serverOrigin) <= 3f ? clientOrigin : serverOrigin;
-
             // a16z STANDARDI: NATIVE SERVER-SIDE LAG COMPENSATION
             // Tüm ağdaki hitboxları oyuncunun sıktığı "geçmiş tick" anına ışınla!
-            if (_rollbackManager != null)
-                _rollbackManager.Rollback(clientTick, RollbackPhysicsType.Physics);
+            HitscanResult hitResult;
+            bool rollbackApplied = false;
+            try
+            {
+                if (_rollbackManager != null)
+                {
+                    _rollbackManager.Rollback(clientTick, RollbackPhysicsType.Physics);
+                    rollbackApplied = true;
+                }
 
-            // Klasik Raycastmizi yapıyoruz (ama artık herkes oyuncunun gördüğü yerde!)
-            var hitResult = _hitscanShooter.FireRay(origin, direction, activeWeapon.data.penetrationPower);
+                // Klasik Raycastmizi yapıyoruz (ama artık herkes oyuncunun gördüğü yerde!)
+                hitResult = _hitscanShooter.FireRay(clientOrigin, direction, activeWeapon.data.penetrationPower);
 
-            // Vurup vurmadığımıza karar verdikten sonra zamanlamayı (hitbox pozisyonlarını) günümüze geri getiriyoruz
-            if (_rollbackManager != null)
-                _rollbackManager.Return();
+                // Vurup vurmadığımıza karar verdikten sonra zamanlamayı (hitbox pozisyonlarını) günümüze geri getiriyoruz
+            }
+            finally
+            {
+                if (rollbackApplied)
+                    _rollbackManager.Return();
+            }
 
             // Hasarı uygula
             if (hitResult.DidHitPlayer && hitResult.TargetObject != null)

@@ -113,7 +113,7 @@ namespace ProjectZ.GameMode
             if (pool == null || pool.Length == 0)
                 return null;
 
-            int randomIndex = Random.Range(0, pool.Length);
+            int randomIndex = SecureRandom.Range(0, pool.Length);
             return pool[randomIndex];
         }
 
@@ -173,7 +173,7 @@ namespace ProjectZ.GameMode
                     yield break;
                 }
 
-                elapsed += Time.deltaTime;
+                elapsed += Time.unscaledDeltaTime;
                 yield return null;
             }
 

@@ -129,7 +129,7 @@ namespace ProjectZ.GameMode
             float buyRemaining = _buyPhaseDuration;
             while (buyRemaining > 0f && !_forceEndRequested)
             {
-                buyRemaining -= Time.deltaTime;
+                buyRemaining -= Time.unscaledDeltaTime;
                 yield return null;
             }
 
@@ -145,7 +145,7 @@ namespace ProjectZ.GameMode
             float actionRemaining = _gameMode != null ? _gameMode.RoundTimeLimit : 105f;
             while (actionRemaining > 0f && !_forceEndRequested)
             {
-                actionRemaining -= Time.deltaTime;
+                actionRemaining -= Time.unscaledDeltaTime;
                 yield return null;
             }
 
@@ -182,7 +182,7 @@ namespace ProjectZ.GameMode
             _gameMode?.OnRoundEnd(winner, RoundNumber.Value);
             GameEvents.InvokeRoundEnd(winner, RoundNumber.Value);
 
-            yield return new WaitForSeconds(_endPhaseDuration);
+            yield return new WaitForSecondsRealtime(_endPhaseDuration);
             SetState(RoundState.Idle);
         }
 
