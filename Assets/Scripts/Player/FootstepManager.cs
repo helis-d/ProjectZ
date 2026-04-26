@@ -1,5 +1,6 @@
 using UnityEngine;
 using ProjectZ.Player;
+using ProjectZ.Core;
 
 namespace ProjectZ.Audio
 {
@@ -129,7 +130,7 @@ namespace ProjectZ.Audio
             clips ??= _defaultRunClips;
             if (clips != null && clips.Length > 0 && _audioSource != null)
             {
-                AudioClip clip = clips[Random.Range(0, clips.Length)];
+                AudioClip clip = clips[SecureRandom.Range(0, clips.Length)];
                 float volume = ProjectZ.Settings.SettingsManager.Instance?.Current.audio.footstepVolume ?? 1.0f;
 
                 // Use priority manager if available
@@ -143,7 +144,7 @@ namespace ProjectZ.Audio
         private void PlayLandSound()
         {
             if (_landClips == null || _landClips.Length == 0 || _audioSource == null) return;
-            AudioClip clip = _landClips[Random.Range(0, _landClips.Length)];
+            AudioClip clip = _landClips[SecureRandom.Range(0, _landClips.Length)];
             float volume = ProjectZ.Settings.SettingsManager.Instance?.Current.audio.footstepVolume ?? 1.0f;
             _audioSource.PlayOneShot(clip, volume);
         }

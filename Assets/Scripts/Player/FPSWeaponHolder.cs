@@ -151,13 +151,17 @@ namespace ProjectZ.Player
             Destroy(grip.GetComponent<Collider>());
 
             // Koyu gri malzeme
-            Material gunMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            if (gunMat != null)
+            Shader litShader = Shader.Find("Universal Render Pipeline/Lit");
+            if (litShader == null)
             {
-                gunMat.color = new Color(0.15f, 0.15f, 0.17f);
-                foreach (var r in gun.GetComponentsInChildren<Renderer>())
-                    r.material = gunMat;
+                Debug.LogWarning("[FPSWeaponHolder] URP/Lit shader not found. Placeholder weapon will use default materials.");
+                return gun;
             }
+
+            Material gunMat = new Material(litShader);
+            gunMat.color = new Color(0.15f, 0.15f, 0.17f);
+            foreach (var r in gun.GetComponentsInChildren<Renderer>())
+                r.material = gunMat;
 
             return gun;
         }

@@ -350,12 +350,14 @@ namespace Synty.SidekickCharacters.Demo
                 int index = _partIndexDictionary[entry.Key];
                 List<SidekickPart> parts = entry.Value.Values.ToList();
                 GameObject partContainer = null;
-                if (parts.Count > 0 && index < parts.Count)
+                if (parts.Count > 0)
                 {
-                    if (index > parts.Count)
+                    if (index < 0 || index >= parts.Count)
                     {
-                        index = parts.Count - 1;
+                        index = Mathf.Clamp(index, 0, parts.Count - 1);
+                        _partIndexDictionary[entry.Key] = index;
                     }
+
                     partContainer = parts[index].GetPartModel();
                 }
                 
