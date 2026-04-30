@@ -14,6 +14,8 @@ namespace ProjectZ.Player
         [SerializeField] private Color _sleeveColor = new Color(0.15f, 0.2f, 0.25f);
         [Tooltip("Oyun çalışırken pozisyonları ayarlayabilmek için tikli bırak")]
         [SerializeField] private bool _autoUpdateInPlayMode = true;
+        [SerializeField] private Material _skinMaterialTemplate;
+        [SerializeField] private Material _sleeveMaterialTemplate;
 
         [Header("Right Hand — Tetik Eli")]
         [SerializeField] private Vector3 _rightHandPos = new Vector3(-0.06f, -0.65f, -0.4f);
@@ -27,9 +29,28 @@ namespace ProjectZ.Player
         private Material _sleeveMat;
         private Transform _rightArmRoot;
         private Transform _leftArmRoot;
+        private bool _initialized;
 
-        private void Awake()
+        public void ConfigureRuntimeMaterials(Material skinMaterial, Material sleeveMaterial)
         {
+            if (skinMaterial != null)
+                _skinMaterialTemplate = skinMaterial;
+
+            if (sleeveMaterial != null)
+                _sleeveMaterialTemplate = sleeveMaterial;
+        }
+
+        private void Start()
+        {
+            InitializeIfNeeded();
+        }
+
+        public void InitializeIfNeeded()
+        {
+            if (_initialized)
+                return;
+
+            _initialized = true;
             CreateMaterials();
             CreateRightArm();
             CreateLeftArm();
@@ -37,14 +58,8 @@ namespace ProjectZ.Player
 
         private void CreateMaterials()
         {
-            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-            if (shader == null) shader = Shader.Find("Standard");
-
-            _skinMat = new Material(shader);
-            _skinMat.color = _skinColor;
-
-            _sleeveMat = new Material(shader);
-            _sleeveMat.color = _sleeveColor;
+            _skinMat = CreateRuntimeMaterial(_skinMaterialTemplate, _skinColor, "skin");
+            _sleeveMat = CreateRuntimeMaterial(_sleeveMaterialTemplate, _sleeveColor, "sleeve");
         }
 
         // ─── SAĞ EL (Tetik eli) ─────────────────────────────────────────
@@ -163,6 +178,35 @@ namespace ProjectZ.Player
             Renderer rend = part.GetComponent<Renderer>();
             if (rend != null && mat != null)
                 rend.material = mat;
+        }
+
+        private static Material CreateRuntimeMaterial(Material template, Color fallbackColor, string label)
+        {
+            if (template != null)
+                return new Material(template);
+
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null)
+                shader = Shader.Find("Standard");
+
+            if (shader == null)
+            {
+                Debug.LogWarning($"[FPSArms] No runtime shader available for {label} material generation.");
+                return null;
+            }
+
+            Material material = new Material(shader);
+            material.color = fallbackColor;
+            return material;
+        }
+
+        private void OnDestroy()
+        {
+            if (_skinMat != null)
+                Destroy(_skinMat);
+
+            if (_sleeveMat != null)
+                Destroy(_sleeveMat);
         }
     }
 }

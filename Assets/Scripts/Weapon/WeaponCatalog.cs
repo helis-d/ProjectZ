@@ -13,6 +13,11 @@ namespace ProjectZ.Weapon
     {
         private static WeaponCatalog _instance;
 
+        public static WeaponData Resolve(string weaponId)
+        {
+            return Instance != null ? Instance.GetById(weaponId) : null;
+        }
+
         public static WeaponCatalog Instance
         {
             get

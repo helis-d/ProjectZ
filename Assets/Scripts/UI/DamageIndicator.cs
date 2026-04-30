@@ -1,4 +1,7 @@
 using System.Collections;
+using FishNet.Object;
+using ProjectZ.Core;
+using ProjectZ.Player;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -8,8 +11,10 @@ namespace ProjectZ.UI
     /// GDD Section 10: Damage visual feedback.
     /// - Lost health red portion slowly decreasing (delayed health bar)
     /// - Directional damage indicator arrows
+    ///
+    /// Subscribes to GameEvents.OnPlayerDamaged automatically once BindLocalPlayer is called.
     /// </summary>
-    public class DamageIndicator : MonoBehaviour
+    public class DamageIndicator : NetworkBehaviour
     {
         [Header("Delayed Health Bar")]
         [SerializeField] private Image _delayedHealthBar;
@@ -25,6 +30,38 @@ namespace ProjectZ.UI
         private float _displayedDelayedHP = 1f;
         private float _actualHP = 1f;
         private float _delayCooldown;
+
+        // Connection ID of the local owner — set via BindLocalPlayer.
+        private int _localConnId = -1;
+
+        /// <summary>
+        /// Call once when the local player spawns. Registers damage event listener.
+        /// </summary>
+        public void BindLocalPlayer(int connectionId)
+        {
+            _localConnId = connectionId;
+        }
+
+        private void OnEnable()
+        {
+            GameEvents.OnPlayerDamaged += HandlePlayerDamaged;
+        }
+
+        private void OnDisable()
+        {
+            GameEvents.OnPlayerDamaged -= HandlePlayerDamaged;
+        }
+
+        /// <summary>Filters incoming damage events to the locally owned player.</summary>
+        private void HandlePlayerDamaged(int victimId, int attackerId, float damage)
+        {
+            if (_localConnId < 0 || victimId != _localConnId)
+                return;
+
+            // Derive a rough world position from the attacker if possible — directional indicator.
+            // For now we pass Vector3.zero; callers can extend to pass attacker position.
+            OnDamageTaken(Mathf.Clamp01(damage / 100f), Vector3.zero);
+        }
 
         /// <summary>Called when player takes damage. normalizedHP is 0-1.</summary>
         public void OnDamageTaken(float normalizedHP, Vector3 damageSourceWorldPos)
@@ -81,12 +118,15 @@ namespace ProjectZ.UI
         {
             if (_indicatorPrefab == null || _indicatorContainer == null) return;
 
+            Camera mainCamera = Camera.main;
+            if (mainCamera == null) return;
+
             GameObject indicator = Instantiate(_indicatorPrefab, _indicatorContainer);
 
             // Calculate angle from player to damage source
-            Vector3 toSource = sourceWorld - Camera.main.transform.position;
+            Vector3 toSource = sourceWorld - mainCamera.transform.position;
             toSource.y = 0f;
-            float angle = Vector3.SignedAngle(Camera.main.transform.forward, toSource, Vector3.up);
+            float angle = Vector3.SignedAngle(mainCamera.transform.forward, toSource, Vector3.up);
 
             indicator.transform.localRotation = Quaternion.Euler(0f, 0f, -angle);
 

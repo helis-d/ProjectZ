@@ -142,7 +142,7 @@ namespace ProjectZ.Monetization
             catalog.hideFlags = HideFlags.HideAndDontSave;
 
             List<MonetizationCatalogOffer> offers = new List<MonetizationCatalogOffer>();
-            int sortOrder = 0;
+            int nextSortOrder = 0;
 
             IReadOnlyList<string> heroIds = MonetizationService.GetAllHeroIds();
             for (int i = 0; i < heroIds.Count; i++)
@@ -164,7 +164,7 @@ namespace ProjectZ.Monetization
                     directPurchase = true,
                     featured = false,
                     availability = MonetizationOfferAvailability.Launch,
-                    sortOrder = sortOrder++
+                    sortOrder = nextSortOrder++
                 });
             }
 
@@ -176,7 +176,7 @@ namespace ProjectZ.Monetization
                 MonetizationCurrencyType.ZCore,
                 900,
                 "weaponskin_vandal_firstlight",
-                sortOrder++,
+                nextSortOrder++,
                 true));
 
             offers.Add(CreateLaunchOffer(
@@ -187,7 +187,7 @@ namespace ProjectZ.Monetization
                 MonetizationCurrencyType.ZCore,
                 250,
                 "playercard_founders_signal",
-                sortOrder++));
+                nextSortOrder++));
 
             offers.Add(CreateLaunchOffer(
                 "launch_spray_hold_the_site",
@@ -197,7 +197,7 @@ namespace ProjectZ.Monetization
                 MonetizationCurrencyType.ZCore,
                 175,
                 "spray_hold_the_site",
-                sortOrder++));
+                nextSortOrder++));
 
             offers.Add(CreateLaunchOffer(
                 "launch_charm_quantum_key",
@@ -207,7 +207,7 @@ namespace ProjectZ.Monetization
                 MonetizationCurrencyType.ZCore,
                 225,
                 "charm_quantum_key",
-                sortOrder++));
+                nextSortOrder++));
 
             offers.Add(new MonetizationCatalogOffer
             {
@@ -221,7 +221,7 @@ namespace ProjectZ.Monetization
                 directPurchase = true,
                 featured = true,
                 availability = MonetizationOfferAvailability.AlphaOnly,
-                sortOrder = sortOrder++
+                sortOrder = nextSortOrder++
             });
 
             offers.Add(new MonetizationCatalogOffer
@@ -236,7 +236,7 @@ namespace ProjectZ.Monetization
                 directPurchase = true,
                 featured = true,
                 availability = MonetizationOfferAvailability.Season2,
-                sortOrder = sortOrder++
+                sortOrder = nextSortOrder++
             });
 
             catalog.InitializeRuntimeOffers(offers.ToArray());

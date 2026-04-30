@@ -39,12 +39,14 @@ namespace ProjectZ.Player
         private WeaponMasteryManager _mastery;
 
         // ─── Helpers ──────────────────────────────────────────────────────
-        private WeaponData GetWeaponData(string id) => WeaponCatalog.Instance?.GetById(id);
+        private WeaponData GetWeaponData(string id) => WeaponCatalog.Resolve(id);
         public WeaponData ActiveWeaponData => GetWeaponData(GetActiveWeaponId());
-        
-        private string GetActiveWeaponId()
+
+        private string GetActiveWeaponId() => GetWeaponIdForSlot(_activeSlot.Value);
+
+        private string GetWeaponIdForSlot(int slot)
         {
-            return _activeSlot.Value switch
+            return slot switch
             {
                 1 => _primaryWeaponId.Value,
                 2 => _secondaryWeaponId.Value,
@@ -61,7 +63,7 @@ namespace ProjectZ.Player
             if (_weaponManager == null)
                 _weaponManager = GetComponentInChildren<WeaponManager>();
 
-            _weaponManager = PlayerWeaponRuntimeBootstrap.EnsureWeaponRig(gameObject, _weaponManager);
+            _weaponManager = WeaponRuntimeRigBuilder.EnsurePlayerRig(gameObject, _weaponManager);
 
             _activeSlot.OnChange += OnActiveSlotChanged;
         }
@@ -71,10 +73,10 @@ namespace ProjectZ.Player
             base.OnStartServer();
 
             if (_defaultSecondary == null)
-                _defaultSecondary = PlayerWeaponRuntimeBootstrap.GetFallbackWeapon("pistol_classic");
+                _defaultSecondary = WeaponCatalog.Resolve("pistol_classic");
 
             if (_defaultMelee == null)
-                _defaultMelee = PlayerWeaponRuntimeBootstrap.GetFallbackWeapon("knife_tactical");
+                _defaultMelee = WeaponCatalog.Resolve("knife_tactical");
 
             if (_defaultSecondary != null)
             {
@@ -88,13 +90,13 @@ namespace ProjectZ.Player
                 _meleeRuntime = new WeaponRuntimeData { WeaponID = _defaultMelee.weaponId };
             }
 
-            EquipWeapon(3, null); // Start with melee
+            EquipWeapon(3); // Start with melee
         }
 
         public override void OnStartClient()
         {
             base.OnStartClient();
-            _weaponManager = PlayerWeaponRuntimeBootstrap.EnsureWeaponRig(gameObject, _weaponManager);
+            _weaponManager = WeaponRuntimeRigBuilder.EnsurePlayerRig(gameObject, _weaponManager);
             RefreshWeaponController();
         }
 
@@ -116,7 +118,7 @@ namespace ProjectZ.Player
         }
 
         [Server]
-        private void EquipWeapon(int slot, WeaponRuntimeData _)
+        private void EquipWeapon(int slot)
         {
             _activeSlot.Value = slot;
             RefreshWeaponController();
@@ -126,17 +128,8 @@ namespace ProjectZ.Player
         private void RequestSwitchSlot(int slot)
         {
             if (slot == _activeSlot.Value) return;
-
-            string id = slot switch
-            {
-                1 => _primaryWeaponId.Value,
-                2 => _secondaryWeaponId.Value,
-                3 => _meleeWeaponId.Value,
-                _ => string.Empty
-            };
-            if (string.IsNullOrEmpty(id)) return;
-
-            EquipWeapon(slot, null);
+            if (string.IsNullOrEmpty(GetWeaponIdForSlot(slot))) return;
+            EquipWeapon(slot);
         }
 
         [ServerRpc]
@@ -230,7 +223,7 @@ namespace ProjectZ.Player
         private void RefreshWeaponController()
         {
             if (_weaponManager == null)
-                _weaponManager = PlayerWeaponRuntimeBootstrap.EnsureWeaponRig(gameObject, _weaponManager);
+                _weaponManager = WeaponRuntimeRigBuilder.EnsurePlayerRig(gameObject, _weaponManager);
 
             if (_weaponManager == null)
                 return;

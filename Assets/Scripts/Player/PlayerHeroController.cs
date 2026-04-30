@@ -143,7 +143,7 @@ namespace ProjectZ.Player
         [Server]
         public void AddCharge(float amount)
         {
-            if (_isPistolRound.Value) // Check pistol round here
+            if (RoundRuleGuards.SuppressProgressionForPistolRound(_isPistolRound.Value))
                 return;
 
             if (UltimateCharge.Value < 100f)
@@ -179,7 +179,7 @@ namespace ProjectZ.Player
             }
 
             if (UltimateCharge.Value < 100f) return false; // Check if ultimate is ready
-            if (_isPistolRound.Value) return false; // Check pistol round
+            if (RoundRuleGuards.SuppressProgressionForPistolRound(_isPistolRound.Value)) return false;
 
             SpendUltimate(); // Use the new method
             _activeUltimate.Activate();

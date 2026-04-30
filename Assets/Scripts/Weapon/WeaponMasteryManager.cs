@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using FishNet.Object;
+using ProjectZ.Core;
 using UnityEngine;
 
 namespace ProjectZ.Weapon
@@ -76,7 +77,7 @@ namespace ProjectZ.Weapon
                 _killsThisRound++;
 
             // GDD: no XP in pistol rounds, but kill counter must continue for cold streak tracking.
-            if (_isPistolRound)
+            if (RoundRuleGuards.SuppressProgressionForPistolRound(_isPistolRound))
                 return;
 
             WeaponRuntimeData data = GetOrCreate(weaponId);
@@ -89,7 +90,7 @@ namespace ProjectZ.Weapon
 
         public void ProcessUltimateCast(List<BaseWeapon> inventory)
         {
-            if (!IsServerInitialized || _isPistolRound)
+            if (!IsServerInitialized || RoundRuleGuards.SuppressProgressionForPistolRound(_isPistolRound))
                 return;
             if (inventory == null || inventory.Count == 0)
                 return;

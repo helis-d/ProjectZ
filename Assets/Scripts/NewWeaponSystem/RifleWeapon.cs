@@ -1,3 +1,4 @@
+using ProjectZ.Core;
 using ProjectZ.Weapon;
 using UnityEngine;
 
@@ -48,8 +49,8 @@ public class RifleWeapon : BaseWeapon
 
         // Raycast ile hasar
         Vector3 spread = new Vector3(
-            Random.Range(-data.bulletSpread, data.bulletSpread),
-            Random.Range(-data.bulletSpread, data.bulletSpread),
+            SecureRandom.Range(-data.bulletSpread, data.bulletSpread),
+            SecureRandom.Range(-data.bulletSpread, data.bulletSpread),
             0f
         );
         if (!TryBuildFireRay(spread, out Ray ray))

@@ -1,3 +1,4 @@
+using ProjectZ.Core;
 using ProjectZ.Weapon;
 using UnityEngine;
 
@@ -47,8 +48,8 @@ public class ShotgunWeapon : BaseWeapon
         for (int i = 0; i < data.pelletsPerShot; i++)
         {
             Vector3 spreadDir = new Vector3(
-                Random.Range(-spread, spread),
-                Random.Range(-spread, spread),
+                SecureRandom.Range(-spread, spread),
+                SecureRandom.Range(-spread, spread),
                 0f
             );
 

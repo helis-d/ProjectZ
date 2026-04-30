@@ -8,8 +8,9 @@ namespace ProjectZ.Network
     [Serializable]
     public sealed class AuthoritativeMatchResultPayload
     {
-        public int version = 1;
+        public int version = 2;
         public string matchKey;
+        public string userId;
         public long issuedAtUnix;
         public string mapId;
         public string gameMode;
@@ -53,6 +54,7 @@ namespace ProjectZ.Network
             {
                 payload.version.ToString(CultureInfo.InvariantCulture),
                 Normalize(payload.matchKey),
+                Normalize(payload.userId),
                 payload.issuedAtUnix.ToString(CultureInfo.InvariantCulture),
                 Normalize(payload.mapId),
                 Normalize(payload.gameMode),
@@ -95,6 +97,7 @@ namespace ProjectZ.Network
             return payload != null
                 && payload.version > 0
                 && !string.IsNullOrWhiteSpace(payload.matchKey)
+                && !string.IsNullOrWhiteSpace(payload.userId)
                 && !string.IsNullOrWhiteSpace(payload.gameMode)
                 && !string.IsNullOrWhiteSpace(payload.winningTeam)
                 && !string.IsNullOrWhiteSpace(payload.playerTeam);

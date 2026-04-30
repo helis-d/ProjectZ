@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -28,7 +29,8 @@ namespace ProjectZ.EditorTools
 
             if (_data != null)
             {
-                GUILayout.Label($"Kills Recorded: {_data.killEvents.Count}");
+                int killCount = _data.killEvents != null ? _data.killEvents.Count : 0;
+                GUILayout.Label($"Kills Recorded: {killCount}");
                 GUILayout.Label($"Match Date: {_data.date}");
 
                 _isVisualizing = GUILayout.Toggle(_isVisualizing, "Enable Scene Visualization");
@@ -48,7 +50,11 @@ namespace ProjectZ.EditorTools
             {
                 string json = File.ReadAllText(filePath);
                 _data = JsonUtility.FromJson<HeatmapTelemetryData>(json);
-                Debug.Log($"[HeatmapVisualizer] Loaded {_data.killEvents.Count} kill events.");
+                if (_data != null && _data.killEvents == null)
+                    _data.killEvents = new List<HeatmapEvent>();
+
+                int killCount = _data != null && _data.killEvents != null ? _data.killEvents.Count : 0;
+                Debug.Log($"[HeatmapVisualizer] Loaded {killCount} kill events.");
             }
             else
             {
@@ -69,7 +75,7 @@ namespace ProjectZ.EditorTools
 
         private void OnSceneGUI(SceneView sceneView)
         {
-            if (!_isVisualizing || _data == null) return;
+            if (!_isVisualizing || _data == null || _data.killEvents == null) return;
 
             foreach (var evt in _data.killEvents)
             {

@@ -25,11 +25,8 @@ namespace ProjectZ.Hero.Kant
 
         public override void OnStopServer()
         {
+            GameEvents.OnPlayerDeath -= HandlePlayerDeath;
             base.OnStopServer();
-            if (IsServerInitialized)
-            {
-                GameEvents.OnPlayerDeath -= HandlePlayerDeath;
-            }
         }
 
         [Server]
