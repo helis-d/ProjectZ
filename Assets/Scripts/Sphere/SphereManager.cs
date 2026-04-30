@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using ProjectZ.Combat;
@@ -34,7 +35,11 @@ namespace ProjectZ.Sphere
         private float _defuseStartTime;
         private bool _defuseUsedKit;
         private const int MaxDetonationColliders = 128;
+        private const float DefuseTimeTolerance = 0.08f;
         private Collider[] _detonationHits;
+
+        // Site cache: populated at server start and refreshed each round.
+        private readonly Dictionary<string, SphereSite> _siteCache = new Dictionary<string, SphereSite>();
 
         private void Awake()
         {
@@ -47,6 +52,19 @@ namespace ProjectZ.Sphere
             _detonationHits = new Collider[MaxDetonationColliders];
         }
 
+        /// <summary>Rebuild the site cache from all SphereSites currently in the scene.</summary>
+        [Server]
+        private void RebuildSiteCache()
+        {
+            _siteCache.Clear();
+            SphereSite[] sites = FindObjectsByType<SphereSite>(FindObjectsSortMode.None);
+            foreach (SphereSite site in sites)
+            {
+                if (site != null && !string.IsNullOrEmpty(site.SiteID))
+                    _siteCache[site.SiteID] = site;
+            }
+        }
+
         private void Update()
         {
             if (!IsServerInitialized)
@@ -55,6 +73,7 @@ namespace ProjectZ.Sphere
             if (CurrentState.Value == SphereState.Active && _isPlanted)
             {
                 Timer.Value -= Time.unscaledDeltaTime;
+                GameEvents.InvokeSphereTimerTick(Timer.Value);
                 if (Timer.Value <= 0f)
                     Detonate();
             }
@@ -64,6 +83,8 @@ namespace ProjectZ.Sphere
         {
             base.OnStartServer();
             GameEvents.OnRoundStart += ResetSphere;
+            // Build cache after one frame so all SphereSite Awakes have run.
+            RebuildSiteCache();
         }
 
         public override void OnStopServer()
@@ -179,7 +200,7 @@ namespace ProjectZ.Sphere
             }
 
             float required = GetDefuseTime(_defuseUsedKit);
-            if (Time.unscaledTime < _defuseStartTime + required - 0.08f)
+            if (Time.unscaledTime < _defuseStartTime + required - DefuseTimeTolerance)
             {
                 CancelDefuse(connId);
                 return;
@@ -235,6 +256,8 @@ namespace ProjectZ.Sphere
             _activePlanterId = -1;
             _activeDefuserId = -1;
             _defuseStartTime = 0f;
+            // Refresh site cache at the start of every round to catch dynamically loaded maps.
+            RebuildSiteCache();
         }
 
         private bool IsValidSite(string siteId)
@@ -244,13 +267,13 @@ namespace ProjectZ.Sphere
 
         private SphereSite FindSite(string siteId)
         {
-            SphereSite[] sites = FindObjectsByType<SphereSite>(FindObjectsSortMode.None);
-            foreach (SphereSite site in sites)
-            {
-                if (site != null && site.SiteID == siteId)
-                    return site;
-            }
-            return null;
+            if (_siteCache.TryGetValue(siteId, out SphereSite cached) && cached != null)
+                return cached;
+
+            // Fallback: scene search (handles late-spawned sites, rebuilds cache).
+            RebuildSiteCache();
+            _siteCache.TryGetValue(siteId, out SphereSite site);
+            return site;
         }
 
         private bool IsPlayerNearSite(int connId, string siteId)

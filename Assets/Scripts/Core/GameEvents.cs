@@ -61,6 +61,20 @@ namespace ProjectZ.Core
         /// <summary>Fired when a player earns an assist. Args: assisterId, victimId.</summary>
         public static event Action<int, int> OnPlayerAssist;
 
+        // ─── Flashbang Event ──────────────────────────────────────────────
+        /// <summary>
+        /// Fired when a flashbang hits a player. Arg: normalizedIntensity (0-1).
+        /// 1.0 = fully blinded (white-out), 0.0 = no effect.
+        /// </summary>
+        public static event Action<float> OnFlashbangHit;
+
+        // ─── Sphere Timer Event ───────────────────────────────────────────
+        /// <summary>
+        /// Fired every server frame while the sphere is Active.
+        /// Arg: remaining seconds on the detonation timer.
+        /// </summary>
+        public static event Action<float> OnSphereTimerTick;
+
         // ─── Invokers (called by owning systems only) ────────────────────
         public static void InvokeRoundStart(int round)          => OnRoundStart?.Invoke(round);
         public static void InvokeRoundEnd(Team winner, int round) => OnRoundEnd?.Invoke(winner, round);
@@ -83,5 +97,9 @@ namespace ProjectZ.Core
             => OnKillDetails?.Invoke(killerId, victimId, weaponId, headshot, wallbang);
         public static void InvokePlayerAssist(int assisterId, int victimId)
             => OnPlayerAssist?.Invoke(assisterId, victimId);
+        public static void InvokeFlashbangHit(float intensity)
+            => OnFlashbangHit?.Invoke(intensity);
+        public static void InvokeSphereTimerTick(float remainingSeconds)
+            => OnSphereTimerTick?.Invoke(remainingSeconds);
     }
 }

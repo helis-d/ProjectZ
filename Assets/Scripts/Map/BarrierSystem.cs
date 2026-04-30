@@ -1,12 +1,12 @@
 using FishNet.Object;
 using ProjectZ.Core;
-using ProjectZ.GameMode;
 using UnityEngine;
 
 namespace ProjectZ.Map
 {
     /// <summary>
     /// Invisible wall active during BuyPhase and disabled during ActionPhase.
+    /// Subscribes to GameEvents instead of polling RoundManager every frame.
     /// </summary>
     [RequireComponent(typeof(BoxCollider))]
     public class BarrierSystem : NetworkBehaviour
@@ -25,29 +25,27 @@ namespace ProjectZ.Map
         public override void OnStartServer()
         {
             base.OnStartServer();
-            GameEvents.OnRoundStart += HandleRoundStart;
+            GameEvents.OnRoundStart      += OnRoundStart;
+            GameEvents.OnBuyPhaseStart   += OnBuyPhaseStart;
+            GameEvents.OnActionPhaseStart += OnActionPhaseStart;
         }
 
         public override void OnStopServer()
         {
             base.OnStopServer();
-            GameEvents.OnRoundStart -= HandleRoundStart;
+            GameEvents.OnRoundStart      -= OnRoundStart;
+            GameEvents.OnBuyPhaseStart   -= OnBuyPhaseStart;
+            GameEvents.OnActionPhaseStart -= OnActionPhaseStart;
         }
 
-        private void Update()
-        {
-            if (!IsServerInitialized)
-                return;
+        // Enable barriers when a new round begins (buy phase is about to start).
+        private void OnRoundStart(int _) => SetActiveState(true);
 
-            RoundManager rm = RoundManager.Instance;
-            if (rm != null)
-                SetActiveState(rm.CurrentState.Value == RoundManager.RoundState.BuyPhase);
-        }
+        // Redundant safety: re-enable barriers when buy phase timer fires.
+        private void OnBuyPhaseStart(float _) => SetActiveState(true);
 
-        private void HandleRoundStart(int _)
-        {
-            SetActiveState(true);
-        }
+        // Disable barriers when the action phase begins.
+        private void OnActionPhaseStart() => SetActiveState(false);
 
         private void SetActiveState(bool isActive)
         {
@@ -66,4 +64,5 @@ namespace ProjectZ.Map
         }
     }
 }
+
 
