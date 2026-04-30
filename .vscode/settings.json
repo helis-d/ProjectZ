@@ -67,5 +67,9 @@
         "*.sln": "*.csproj",
         "*.slnx": "*.csproj"
     },
-    "dotnet.defaultSolution": "ProjectZ.slnx"
+    "dotnet.defaultSolution": "ProjectZ.slnx",
+    "sonarlint.connectedMode.project": {
+        "connectionId": "helis-d",
+        "projectKey": "helis-d_ProjectZ"
+    }
 }
