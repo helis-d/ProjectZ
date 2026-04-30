@@ -41,10 +41,12 @@ namespace ProjectZ.Player
         // ─── Helpers ──────────────────────────────────────────────────────
         private WeaponData GetWeaponData(string id) => WeaponCatalog.Resolve(id);
         public WeaponData ActiveWeaponData => GetWeaponData(GetActiveWeaponId());
-        
-        private string GetActiveWeaponId()
+
+        private string GetActiveWeaponId() => GetWeaponIdForSlot(_activeSlot.Value);
+
+        private string GetWeaponIdForSlot(int slot)
         {
-            return _activeSlot.Value switch
+            return slot switch
             {
                 1 => _primaryWeaponId.Value,
                 2 => _secondaryWeaponId.Value,
@@ -88,7 +90,7 @@ namespace ProjectZ.Player
                 _meleeRuntime = new WeaponRuntimeData { WeaponID = _defaultMelee.weaponId };
             }
 
-            EquipWeapon(3, null); // Start with melee
+            EquipWeapon(3); // Start with melee
         }
 
         public override void OnStartClient()
@@ -116,7 +118,7 @@ namespace ProjectZ.Player
         }
 
         [Server]
-        private void EquipWeapon(int slot, WeaponRuntimeData _)
+        private void EquipWeapon(int slot)
         {
             _activeSlot.Value = slot;
             RefreshWeaponController();
@@ -126,17 +128,8 @@ namespace ProjectZ.Player
         private void RequestSwitchSlot(int slot)
         {
             if (slot == _activeSlot.Value) return;
-
-            string id = slot switch
-            {
-                1 => _primaryWeaponId.Value,
-                2 => _secondaryWeaponId.Value,
-                3 => _meleeWeaponId.Value,
-                _ => string.Empty
-            };
-            if (string.IsNullOrEmpty(id)) return;
-
-            EquipWeapon(slot, null);
+            if (string.IsNullOrEmpty(GetWeaponIdForSlot(slot))) return;
+            EquipWeapon(slot);
         }
 
         [ServerRpc]

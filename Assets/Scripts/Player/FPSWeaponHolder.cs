@@ -13,6 +13,9 @@ namespace ProjectZ.Player
         [Header("Weapon Model")]
         [Tooltip("Silah modeli prefab'ı (SK_Gun gibi). Boş bırakırsan kod çalışmaz.")]
         [SerializeField] private GameObject _weaponPrefab;
+        [SerializeField] private Material _placeholderWeaponMaterial;
+        [SerializeField] private Material _placeholderSkinMaterial;
+        [SerializeField] private Material _placeholderSleeveMaterial;
 
         [Header("Position — Silahın Ekrandaki Konumu")]
         [SerializeField] private Vector3 _weaponOffset = new Vector3(0.18f, -0.25f, 0.4f);
@@ -71,6 +74,7 @@ namespace ProjectZ.Player
         // Base pose
         private Vector3 _basePosition;
         private Quaternion _baseRotation;
+        private Material _runtimePlaceholderMaterial;
 
         // Sprint FOV iletişimi
         private VFX.SprintFOVEffect _fovEffect;
@@ -118,10 +122,12 @@ namespace ProjectZ.Player
             _baseRotation = Quaternion.Euler(_weaponRotation);
 
             // Silaha otomatik olarak FPS ellerini ekle
-            if (weaponObj.GetComponent<FPSArms>() == null)
-            {
-                weaponObj.AddComponent<FPSArms>();
-            }
+            FPSArms arms = weaponObj.GetComponent<FPSArms>();
+            if (arms == null)
+                arms = weaponObj.AddComponent<FPSArms>();
+
+            arms.ConfigureRuntimeMaterials(_placeholderSkinMaterial, _placeholderSleeveMaterial);
+            arms.InitializeIfNeeded();
         }
 
         private GameObject CreatePlaceholderGun()
@@ -151,19 +157,34 @@ namespace ProjectZ.Player
             Destroy(grip.GetComponent<Collider>());
 
             // Koyu gri malzeme
+            _runtimePlaceholderMaterial = CreatePlaceholderMaterial();
+            if (_runtimePlaceholderMaterial == null)
+                return gun;
+
+            foreach (var r in gun.GetComponentsInChildren<Renderer>())
+                r.sharedMaterial = _runtimePlaceholderMaterial;
+
+            return gun;
+        }
+
+        private Material CreatePlaceholderMaterial()
+        {
+            if (_placeholderWeaponMaterial != null)
+                return new Material(_placeholderWeaponMaterial);
+
             Shader litShader = Shader.Find("Universal Render Pipeline/Lit");
             if (litShader == null)
+                litShader = Shader.Find("Standard");
+
+            if (litShader == null)
             {
-                Debug.LogWarning("[FPSWeaponHolder] URP/Lit shader not found. Placeholder weapon will use default materials.");
-                return gun;
+                Debug.LogWarning("[FPSWeaponHolder] No runtime shader available for placeholder weapon material.");
+                return null;
             }
 
             Material gunMat = new Material(litShader);
             gunMat.color = new Color(0.15f, 0.15f, 0.17f);
-            foreach (var r in gun.GetComponentsInChildren<Renderer>())
-                r.material = gunMat;
-
-            return gun;
+            return gunMat;
         }
 
         private void LateUpdate()
@@ -310,6 +331,12 @@ namespace ProjectZ.Player
             {
                 TriggerReload(2f); // 2 saniye reload
             }
+        }
+
+        private void OnDestroy()
+        {
+            if (_runtimePlaceholderMaterial != null)
+                Destroy(_runtimePlaceholderMaterial);
         }
     }
 }

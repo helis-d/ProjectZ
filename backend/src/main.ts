@@ -30,6 +30,11 @@ const ENABLE_SEASON2_ENV = "PROJECTZ_ENABLE_SEASON2";
 const ENABLE_EVENT_CONTENT_ENV = "PROJECTZ_ENABLE_EVENT_CONTENT";
 const MATCH_RESULT_SECRET_ENV = "PROJECTZ_MATCH_RESULT_SECRET";
 const MATCH_RESULT_MAX_AGE_SECONDS = 900;
+const MAX_MATCH_DURATION_SECONDS = 7200;
+const MAX_TOTAL_ROUNDS = 50;
+const MAX_PLAYER_COMBAT_EVENTS = 256;
+const MAX_ULTIMATE_ACTIVATIONS = 100;
+const MAX_PEAK_CREDITS_THIS_MATCH = 50000;
 
 const PURCHASE_STATUS_SUCCESS = 0;
 const PURCHASE_STATUS_INVALID_PROFILE = 1;
@@ -38,6 +43,7 @@ const PURCHASE_STATUS_ALREADY_OWNED = 3;
 const PURCHASE_STATUS_INSUFFICIENT_FUNDS = 4;
 const PURCHASE_STATUS_OFFER_NOT_ACTIVE = 5;
 const PURCHASE_STATUS_UNKNOWN_HERO = 6;
+const PURCHASE_STATUS_WALLET_ERROR = 7;
 
 const CURRENCY_NONE = 0;
 const CURRENCY_COMMAND_CREDITS = 1;
@@ -163,6 +169,29 @@ interface MatchResultReceipt {
 interface WalletState {
     commandCredits: number;
     zCore: number;
+}
+
+interface WalletSpendResult {
+    succeeded: boolean;
+    wallet: WalletState;
+    errorCode: string | null;
+    error?: string;
+}
+
+interface NormalizedMatchStats {
+    matchDurationSeconds: number;
+    totalRounds: number;
+    attackerRoundsWon: number;
+    defenderRoundsWon: number;
+    kills: number;
+    deaths: number;
+    assists: number;
+    headshotCount: number;
+    wallbangCount: number;
+    spherePlantsCount: number;
+    sphereDefusesCount: number;
+    ultimateActivations: number;
+    peakCreditsThisMatch: number;
 }
 
 interface RankedResponsePayload {
@@ -320,6 +349,21 @@ function RpcSubmitMatchTelemetry(ctx: nkruntime.Context, logger: nkruntime.Logge
 
     try {
         const request = parsePayload(payload);
+        const stats = normalizeMatchStats(
+            readNumber(request.matchDurationSeconds, 0),
+            readNumber(request.totalRoundsPlayed, 0),
+            readNumber(request.attackerRoundsWon, 0),
+            readNumber(request.defenderRoundsWon, 0),
+            readNumber(request.kills, 0),
+            readNumber(request.deaths, 0),
+            readNumber(request.assists, 0),
+            readNumber(request.headshotCount, 0),
+            readNumber(request.wallbangCount, 0),
+            readNumber(request.spherePlantsCount, 0),
+            readNumber(request.sphereDefusesCount, 0),
+            readNumber(request.ultimateActivations, 0),
+            readNumber(request.peakCreditsThisMatch, 0)
+        );
         const matchKey = nk.uuidv4().replace(/-/g, "");
         const timestampUnix = Math.floor(Date.now() / 1000);
         const telemetry = {
@@ -329,24 +373,24 @@ function RpcSubmitMatchTelemetry(ctx: nkruntime.Context, logger: nkruntime.Logge
             map_id: stringifyValue(request.mapId, "unknown_map"),
             game_mode: stringifyValue(request.gameMode, "unknown_mode"),
             winning_team: stringifyValue(request.winningTeam, "unknown_team"),
-            match_duration_sec: clampMin(readNumber(request.matchDurationSeconds, 0), 0),
-            total_rounds: clampMin(readNumber(request.totalRoundsPlayed, 0), 0),
-            attacker_rounds_won: clampMin(readNumber(request.attackerRoundsWon, 0), 0),
-            defender_rounds_won: clampMin(readNumber(request.defenderRoundsWon, 0), 0),
-            kills: clampMin(readNumber(request.kills, 0), 0),
-            deaths: clampMin(readNumber(request.deaths, 0), 0),
-            assists: clampMin(readNumber(request.assists, 0), 0),
-            headshot_count: clampMin(readNumber(request.headshotCount, 0), 0),
-            wallbang_count: clampMin(readNumber(request.wallbangCount, 0), 0),
+            match_duration_sec: stats.matchDurationSeconds,
+            total_rounds: stats.totalRounds,
+            attacker_rounds_won: stats.attackerRoundsWon,
+            defender_rounds_won: stats.defenderRoundsWon,
+            kills: stats.kills,
+            deaths: stats.deaths,
+            assists: stats.assists,
+            headshot_count: stats.headshotCount,
+            wallbang_count: stats.wallbangCount,
             was_mvp: !!request.wasMvp,
             hero_id: normalizeId(request.heroId),
             most_used_weapon_id: normalizeId(request.mostUsedWeaponId),
-            sphere_plants: clampMin(readNumber(request.spherePlantsCount, 0), 0),
-            sphere_defuses: clampMin(readNumber(request.sphereDefusesCount, 0), 0),
-            ultimate_activations: clampMin(readNumber(request.ultimateActivations, 0), 0),
+            sphere_plants: stats.spherePlantsCount,
+            sphere_defuses: stats.sphereDefusesCount,
+            ultimate_activations: stats.ultimateActivations,
             elo_before: clampMin(readNumber(request.eloBefore, MINIMUM_RATING), MINIMUM_RATING),
             elo_delta: readNumber(request.eloDelta, 0),
-            peak_credits_this_match: clampMin(readNumber(request.peakCreditsThisMatch, 0), 0)
+            peak_credits_this_match: stats.peakCreditsThisMatch
         };
 
         nk.storageWrite([{
@@ -401,8 +445,10 @@ function RpcFinalizeSignedMatchResult(ctx: nkruntime.Context, logger: nkruntime.
             }));
         }
 
+        const normalizedRequest = sanitizeSignedMatchResultForProcessing(request);
+
         const loaded = loadOrCreateProfile(ctx.userId, ctx.username, nk);
-        const existingReceipt = readMatchResultReceipt(ctx.userId, request.matchKey, nk);
+        const existingReceipt = readMatchResultReceipt(ctx.userId, normalizedRequest.matchKey, nk);
         if (existingReceipt) {
             return JSON.stringify(signedMatchResultResponse({
                 succeeded: true,
@@ -423,8 +469,8 @@ function RpcFinalizeSignedMatchResult(ctx: nkruntime.Context, logger: nkruntime.
         let newRating = previousRating;
         let delta = 0;
 
-        if (request.gameMode === "ranked") {
-            const performance = signedPayloadToRankedResult(request, loaded.profile);
+        if (normalizedRequest.gameMode === "ranked") {
+            const performance = signedPayloadToRankedResult(normalizedRequest, loaded.profile);
             delta = calculateRankedRatingDelta(performance, previousRating, loaded.profile.rankedMatchesPlayed);
             newRating = applyRankedRatingDelta(previousRating, delta);
 
@@ -451,7 +497,7 @@ function RpcFinalizeSignedMatchResult(ctx: nkruntime.Context, logger: nkruntime.
                         won: performance.won,
                         opponentAverageRating: performance.opponentAverageRating,
                         rankedMatchesPlayed: loaded.profile.rankedMatchesPlayed,
-                        matchKey: request.matchKey
+                        matchKey: normalizedRequest.matchKey
                     },
                     nkruntime.OverrideOperator.SET);
             } catch (error) {
@@ -459,10 +505,10 @@ function RpcFinalizeSignedMatchResult(ctx: nkruntime.Context, logger: nkruntime.
             }
         }
 
-        const telemetrySaved = writeSignedTelemetry(ctx.userId, logger, nk, request, previousRating, delta);
+        const telemetrySaved = writeSignedTelemetry(ctx.userId, logger, nk, normalizedRequest, previousRating, delta);
         writeProfile(ctx.userId, loaded.profile, loaded.version, nk);
-        writeMatchResultReceipt(ctx.userId, request.matchKey, nk, {
-            matchKey: request.matchKey,
+        writeMatchResultReceipt(ctx.userId, normalizedRequest.matchKey, nk, {
+            matchKey: normalizedRequest.matchKey,
             previousRating: previousRating,
             newRating: newRating,
             delta: delta,
@@ -478,7 +524,7 @@ function RpcFinalizeSignedMatchResult(ctx: nkruntime.Context, logger: nkruntime.
             previousRating: previousRating,
             newRating: newRating,
             delta: delta,
-            matchKey: request.matchKey,
+            matchKey: normalizedRequest.matchKey,
             telemetrySaved: telemetrySaved,
             alreadyProcessed: false,
             persist: true
@@ -629,7 +675,11 @@ function tryUnlockHero(userId: string, nk: nkruntime.Nakama, profile: PlayerProf
         heroId: heroId
     });
     if (!walletSpend.succeeded) {
-        return purchase(PURCHASE_STATUS_INSUFFICIENT_FUNDS, "hero_unlock_" + heroId, heroId, "Not enough Command Credits.", CURRENCY_COMMAND_CREDITS, 0);
+        if (walletSpend.errorCode === "insufficient_funds") {
+            return purchase(PURCHASE_STATUS_INSUFFICIENT_FUNDS, "hero_unlock_" + heroId, heroId, "Not enough Command Credits.", CURRENCY_COMMAND_CREDITS, 0);
+        }
+
+        return purchase(PURCHASE_STATUS_WALLET_ERROR, "hero_unlock_" + heroId, heroId, "Wallet update failed. Hero unlock was not applied.", CURRENCY_COMMAND_CREDITS, 0);
     }
     applyWalletStateToProfile(profile, walletSpend.wallet);
     profile.ownedHeroIds.push(heroId);
@@ -656,7 +706,11 @@ function tryPurchaseOffer(ctx: nkruntime.Context, userId: string, nk: nkruntime.
         contentId: offer.contentId
     });
     if (!walletSpend.succeeded) {
-        return purchase(PURCHASE_STATUS_INSUFFICIENT_FUNDS, offer.offerId, offer.contentId, "Insufficient funds.", offer.priceCurrency, 0);
+        if (walletSpend.errorCode === "insufficient_funds") {
+            return purchase(PURCHASE_STATUS_INSUFFICIENT_FUNDS, offer.offerId, offer.contentId, "Insufficient funds.", offer.priceCurrency, 0);
+        }
+
+        return purchase(PURCHASE_STATUS_WALLET_ERROR, offer.offerId, offer.contentId, "Wallet update failed. Purchase was not applied.", offer.priceCurrency, 0);
     }
     applyWalletStateToProfile(profile, walletSpend.wallet);
     grantOffer(profile, offer);
@@ -719,14 +773,19 @@ function isOfferActive(ctx: nkruntime.Context, offer: CatalogOffer): boolean {
     return false;
 }
 
-function spendWalletCurrency(userId: string, nk: nkruntime.Nakama, currencyType: number, amount: number, metadata?: {[key: string]: any}) {
+function spendWalletCurrency(userId: string, nk: nkruntime.Nakama, currencyType: number, amount: number, metadata?: {[key: string]: any}): WalletSpendResult {
     if (amount <= 0) {
-        return { succeeded: true, wallet: readWalletState(userId, nk) };
+        return { succeeded: true, wallet: readWalletState(userId, nk), errorCode: null };
     }
 
     const walletKey = getWalletId(currencyType);
     if (!walletKey) {
-        return { succeeded: false, wallet: readWalletState(userId, nk) };
+        return { succeeded: false, wallet: readWalletState(userId, nk), errorCode: "invalid_currency" };
+    }
+
+    const currentWallet = readWalletState(userId, nk);
+    if (getWalletBalance(currentWallet, currencyType) < amount) {
+        return { succeeded: false, wallet: currentWallet, errorCode: "insufficient_funds" };
     }
 
     const changeset: {[key: string]: number} = {};
@@ -734,10 +793,113 @@ function spendWalletCurrency(userId: string, nk: nkruntime.Nakama, currencyType:
 
     try {
         const walletResult = nk.walletUpdate(userId, changeset, metadata || {}, true);
-        return { succeeded: true, wallet: walletStateFromRaw(walletResult.updated) };
+        return { succeeded: true, wallet: walletStateFromRaw(walletResult.updated), errorCode: null };
     } catch (error) {
-        return { succeeded: false, wallet: readWalletState(userId, nk), error: errorToString(error) };
+        return { succeeded: false, wallet: currentWallet, errorCode: "wallet_update_failed", error: errorToString(error) };
     }
+}
+
+function getWalletBalance(wallet: WalletState, currencyType: number): number {
+    if (currencyType === CURRENCY_COMMAND_CREDITS) return clampMin(readNumber(wallet.commandCredits, 0), 0);
+    if (currencyType === CURRENCY_ZCORE) return clampMin(readNumber(wallet.zCore, 0), 0);
+    return 0;
+}
+
+function normalizeMatchStats(
+    matchDurationSeconds: number,
+    totalRoundsPlayed: number,
+    attackerRoundsWon: number,
+    defenderRoundsWon: number,
+    kills: number,
+    deaths: number,
+    assists: number,
+    headshotCount: number,
+    wallbangCount: number,
+    spherePlantsCount: number,
+    sphereDefusesCount: number,
+    ultimateActivations: number,
+    peakCreditsThisMatch: number
+): NormalizedMatchStats {
+    const safeMatchDuration = clampMax(clampMin(readNumber(matchDurationSeconds, 0), 0), MAX_MATCH_DURATION_SECONDS);
+    const safeAttackerRounds = clampMax(clampMin(readNumber(attackerRoundsWon, 0), 0), MAX_TOTAL_ROUNDS);
+    const safeDefenderRounds = clampMax(clampMin(readNumber(defenderRoundsWon, 0), 0), MAX_TOTAL_ROUNDS);
+    const scoreDerivedRounds = clampMax(safeAttackerRounds + safeDefenderRounds, MAX_TOTAL_ROUNDS);
+    const safeTotalRounds = clampMax(Math.max(scoreDerivedRounds, clampMin(readNumber(totalRoundsPlayed, 0), 0)), MAX_TOTAL_ROUNDS);
+    const combatEventCap = calculateCombatEventCap(safeMatchDuration, safeTotalRounds);
+
+    const safeKills = clampMax(clampMin(readNumber(kills, 0), 0), combatEventCap);
+    const safeDeaths = clampMax(clampMin(readNumber(deaths, 0), 0), combatEventCap);
+    const safeAssists = clampMax(clampMin(readNumber(assists, 0), 0), combatEventCap);
+    const objectiveCap = Math.max(1, safeTotalRounds);
+    const ultimateCap = clampMax(Math.max(10, safeTotalRounds * 2), MAX_ULTIMATE_ACTIVATIONS);
+
+    return {
+        matchDurationSeconds: safeMatchDuration,
+        totalRounds: safeTotalRounds,
+        attackerRoundsWon: safeAttackerRounds,
+        defenderRoundsWon: safeDefenderRounds,
+        kills: safeKills,
+        deaths: safeDeaths,
+        assists: safeAssists,
+        headshotCount: clampMax(clampMin(readNumber(headshotCount, 0), 0), safeKills),
+        wallbangCount: clampMax(clampMin(readNumber(wallbangCount, 0), 0), safeKills),
+        spherePlantsCount: clampMax(clampMin(readNumber(spherePlantsCount, 0), 0), objectiveCap),
+        sphereDefusesCount: clampMax(clampMin(readNumber(sphereDefusesCount, 0), 0), objectiveCap),
+        ultimateActivations: clampMax(clampMin(readNumber(ultimateActivations, 0), 0), ultimateCap),
+        peakCreditsThisMatch: clampMax(clampMin(readNumber(peakCreditsThisMatch, 0), 0), MAX_PEAK_CREDITS_THIS_MATCH)
+    };
+}
+
+function calculateCombatEventCap(matchDurationSeconds: number, totalRounds: number): number {
+    const durationCap = Math.floor(clampMin(readNumber(matchDurationSeconds, 0), 0) / 2);
+    const roundCap = clampMin(readNumber(totalRounds, 0), 0) * 6;
+    return clampMax(Math.max(24, durationCap, roundCap), MAX_PLAYER_COMBAT_EVENTS);
+}
+
+function sanitizeSignedMatchResultForProcessing(payload: SignedMatchResultPayload): SignedMatchResultPayload {
+    const stats = normalizeMatchStats(
+        payload.matchDurationSeconds,
+        payload.attackerRoundsWon + payload.defenderRoundsWon,
+        payload.attackerRoundsWon,
+        payload.defenderRoundsWon,
+        payload.kills,
+        payload.deaths,
+        payload.assists,
+        payload.headshotCount,
+        payload.wallbangCount,
+        payload.spherePlantsCount,
+        payload.sphereDefusesCount,
+        payload.ultimateActivations,
+        payload.peakCreditsThisMatch
+    );
+
+    return {
+        version: payload.version,
+        matchKey: payload.matchKey,
+        userId: payload.userId,
+        issuedAtUnix: payload.issuedAtUnix,
+        mapId: payload.mapId,
+        gameMode: payload.gameMode,
+        playerTeam: payload.playerTeam,
+        winningTeam: payload.winningTeam,
+        won: payload.won,
+        attackerRoundsWon: stats.attackerRoundsWon,
+        defenderRoundsWon: stats.defenderRoundsWon,
+        kills: stats.kills,
+        deaths: stats.deaths,
+        assists: stats.assists,
+        wasMvp: payload.wasMvp,
+        heroId: payload.heroId,
+        matchDurationSeconds: stats.matchDurationSeconds,
+        headshotCount: stats.headshotCount,
+        wallbangCount: stats.wallbangCount,
+        spherePlantsCount: stats.spherePlantsCount,
+        sphereDefusesCount: stats.sphereDefusesCount,
+        ultimateActivations: stats.ultimateActivations,
+        peakCreditsThisMatch: stats.peakCreditsThisMatch,
+        mostUsedWeaponId: payload.mostUsedWeaponId,
+        signature: payload.signature
+    };
 }
 
 function response(succeeded: boolean, errorCode: string | null, message: string, profile: PlayerProfileData | null, purchaseResult?: any, persist?: boolean) {
@@ -793,6 +955,7 @@ function purchaseStatusToCode(status: number): string | null {
     if (status === PURCHASE_STATUS_INSUFFICIENT_FUNDS) return "insufficient_funds";
     if (status === PURCHASE_STATUS_OFFER_NOT_ACTIVE) return "offer_not_active";
     if (status === PURCHASE_STATUS_UNKNOWN_HERO) return "unknown_hero";
+    if (status === PURCHASE_STATUS_WALLET_ERROR) return "wallet_update_failed";
     return "unknown_error";
 }
 
@@ -1171,6 +1334,7 @@ function readNumber(value: any, fallback: number): number {
     return parsed;
 }
 function clampMin(value: number, minimum: number): number { return Math.max(value, minimum); }
+function clampMax(value: number, maximum: number): number { return Math.min(value, maximum); }
 function clamp(value: number, minimum: number, maximum: number): number { return Math.min(Math.max(value, minimum), maximum); }
 function errorToString(error: unknown): string { return error instanceof Error ? error.message : String(error); }
 function containsString(source: string[], value: string): boolean {
